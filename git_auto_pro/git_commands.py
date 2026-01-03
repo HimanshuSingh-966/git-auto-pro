@@ -22,21 +22,44 @@ def get_repo() -> git.Repo:
 
 
 def git_init(connect: Optional[str] = None) -> None:
-    """Initialize Git repository."""
+    """Initialize Git repository and optionally connect to remote."""
     try:
-        if Path(".git").exists():
+        repo_exists = Path(".git").exists()
+        
+        if repo_exists:
             console.print("[yellow]Repository already initialized[/yellow]")
-            return
+            repo = git.Repo(".")
+        else:
+            repo = git.Repo.init(".")
+            console.print("[green]✓ Initialized empty Git repository[/green]")
         
-        repo = git.Repo.init(".")
-        console.print("[green]✓ Initialized empty Git repository[/green]")
-        
+        # Add remote even if repo already exists (FIXED!)
         if connect:
-            repo.create_remote("origin", connect)
-            console.print(f"[green]✓ Added remote: {connect}[/green]")
+            try:
+                # Check if remote already exists
+                remotes = {remote.name: remote for remote in repo.remotes}
+                
+                if "origin" in remotes:
+                    # Remote exists, check if URL is different
+                    existing_url = remotes["origin"].url
+                    if existing_url == connect:
+                        console.print(f"[yellow]Remote 'origin' already set to: {connect}[/yellow]")
+                    else:
+                        # Update the URL
+                        remotes["origin"].set_url(connect)
+                        console.print(f"[green]✓ Updated remote 'origin' to: {connect}[/green]")
+                else:
+                    # Add new remote
+                    repo.create_remote("origin", connect)
+                    console.print(f"[green]✓ Added remote 'origin': {connect}[/green]")
+                    
+            except Exception as e:
+                console.print(f"[red]✗ Failed to configure remote: {e}[/red]")
+                raise
             
     except Exception as e:
         console.print(f"[red]✗ Failed to initialize repository: {e}[/red]")
+        raise
 
 
 def git_add(files: Optional[List[str]] = None, all: bool = False) -> None:
@@ -104,6 +127,11 @@ def git_push(message: Optional[str] = None, branch: str = "main", force: bool = 
             repo.index.commit(message)
             console.print(f"[green]✓ Committed: {message}[/green]")
         
+        # Check if remote exists
+        if not repo.remotes:
+            console.print("[red]✗ No remote configured. Use 'git-auto init --connect <url>' first.[/red]")
+            return
+        
         # Push to remote
         if force:
             git_cmd.push("origin", branch, force=True)
@@ -114,6 +142,7 @@ def git_push(message: Optional[str] = None, branch: str = "main", force: bool = 
             
     except Exception as e:
         console.print(f"[red]✗ Failed to push: {e}[/red]")
+        console.print("[yellow]Hint: Make sure remote is configured with 'git-auto init --connect <url>'[/yellow]")
 
 
 def git_pull(branch: Optional[str] = None, rebase: bool = False) -> None:
