@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial release preparation
 
-## [1.0.0] - 2024-01-XX
+## [1.0.0] - 2026-01-03
 
 ### Added
 - GitHub authentication with secure keyring storage
@@ -101,33 +101,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## Release Notes Format
+## Release Notes
 
-### [Version] - YYYY-MM-DD
+## [1.1.0] - 2026-01-04
 
-#### Added
-- New features
+### Added
+- **Interactive .gitignore Manager** 🎉
+  - `git-auto ignore-manager` command
+  - Browse all project files with ignore status
+  - Select files to ignore with checkbox interface
+  - Add patterns by type (folder, extension, file, custom)
+  - Common presets (Python, Node.js, IDEs, Build artifacts, Logs)
+  - Remove patterns from .gitignore
+  - Clean already-tracked files from git
+  - Preview changes before saving
+  - Show current .gitignore patterns
 
-#### Changed
-- Changes in existing functionality
+### Enhanced
+- Better file management workflow
+- More user-friendly .gitignore creation
+- Visual feedback for ignore status
 
-#### Deprecated
-- Soon-to-be removed features
-
-#### Removed
-- Removed features
-
-#### Fixed
-- Bug fixes
-
-#### Security
-- Security updates
+### Features
+- 34 commands (up from 33)
+- 7 core modules (up from 6)
 
 ---
 
 ## Future Releases
 
-### [1.1.0] - Planned
+### [1.1.5] - Planned
 - VS Code extension integration
 - GitLab full support
 - Bitbucket support

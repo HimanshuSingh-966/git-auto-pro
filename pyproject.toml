@@ -5,12 +5,12 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "git-auto-pro"
 version = "1.0.0"
-description = "Complete Git + GitHub automation CLI tool"
+description = "Complete Git + GitHub automation CLI tool with interactive file management"
 authors = [{name = "Your Name", email = "your.email@example.com"}]
 readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
-keywords = ["git", "github", "cli", "automation", "devtools"]
+keywords = ["git", "github", "cli", "automation", "devtools", "gitignore", "interactive"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",

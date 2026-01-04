@@ -180,6 +180,39 @@ git-auto readme
 git-auto readme --output docs/README.md
 ```
 
+#### `git-auto ignore-manager`
+
+Launch interactive .gitignore file manager.
+
+**Usage:**
+```bash
+git-auto ignore-manager
+```
+
+**Features:**
+- Browse all project files
+- Interactive checkbox selection
+- Preset patterns (Python, Node, etc.)
+- Add by type (folder, extension, file)
+- View ignore status
+- Remove patterns
+- Clean tracked files
+
+**Example:**
+```bash
+# Launch manager
+git-auto ignore-manager
+
+# Menu options:
+# - View all files (with ignore status)
+# - Add files/patterns to ignore
+# - Remove patterns from ignore
+# - Browse and select files to ignore
+# - Show current .gitignore
+# - Clean: Remove ignored files from git
+# - Save and exit
+```
+
 ## Configuration Options
 
 ### Available Keys

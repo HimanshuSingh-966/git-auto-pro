@@ -241,6 +241,15 @@ git-auto template cpp                          # C++ project
 git-auto template web                          # Web project
 git-auto template rust                         # Rust project
 git-auto template go                           # Go project
+git-auto ignore-manager                        # Launch interactive manager
+
+# Features:
+# - Browse all project files
+# - Select files to ignore with checkboxes
+# - Add patterns by type (folder, extension, file)
+# - Use common presets (Python, Node, etc.)
+# - View ignore status of all files
+# - Clean already-tracked files
 ```
 
 ### Workflows & Hooks

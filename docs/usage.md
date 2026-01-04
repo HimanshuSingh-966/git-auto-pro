@@ -138,6 +138,39 @@ git-auto template python
 git-auto template node
 ```
 
+### Interactive .gitignore Manager
+The interactive manager lets you browse and select files to ignore:
+```bash
+# Launch interactive manager
+git-auto ignore-manager
+
+# Interactive features:
+# 1. View all files with ignore status
+# 2. Browse and select files with checkboxes
+# 3. Add patterns by type (folder/extension/file)
+# 4. Use common presets (Python, Node, IDEs, etc.)
+# 5. Remove patterns from .gitignore
+# 6. Clean already-tracked files from git
+# 7. Preview changes before saving
+```
+
+**Common workflows:**
+```bash
+# New project setup
+git-auto ignore-manager
+# → Select "Common presets"
+# → Choose "Python"
+# → Browse and select project-specific files
+# → Save
+
+# Fix tracked files that should be ignored
+git-auto ignore-manager
+# → Add patterns for those files
+# → Select "Clean: Remove ignored files"
+# → Commit changes
+```
+
+
 ### Workflows
 
 ```bash

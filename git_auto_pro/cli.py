@@ -459,6 +459,16 @@ def version():
         border_style="cyan"
     ))
 
+# ============================================================================
+# GITIGNORE MANAGER
+# ============================================================================
+
+@app.command()
+def ignore_manager():
+    """🎯 Interactive .gitignore file manager - browse and select files."""
+    from .gitignore_manager import interactive_gitignore_manager
+    
+    interactive_gitignore_manager()
 
 if __name__ == "__main__":
     app()

@@ -21,6 +21,7 @@ git-auto-pro/
 │   ├── cli.py              # CLI interface (Typer commands)
 │   ├── github.py           # GitHub API integration
 │   ├── git_commands.py     # Git operations (GitPython)
+│   ├── gitignore_manager.py #Interactive .gitignore Manager
 │   ├── config.py           # Configuration management
 │   ├── backup.py           # Backup/restore functionality
 │   └── scaffolding/        # Project generators
@@ -134,6 +135,15 @@ git-auto status
 git-auto add --all
 git-auto commit "Test commit"
 ```
+
+### File Management (NEW!)
+````bash
+- ✅ `git-auto ignore-manager` - Interactive .gitignore manager
+  - Browse all files in project
+  - Select files to ignore with checkboxes
+  - Use preset patterns
+  - Clean tracked files
+````
 
 ## 🧪 Testing
 

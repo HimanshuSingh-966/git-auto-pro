@@ -157,5 +157,45 @@ git-auto templates pr
 git-auto templates contributing
 ```
 
+## Example 6: Interactive .gitignore Setup
+
+Clean up a project by managing ignored files interactively.
+```bash
+# You have a messy project with tracked files that shouldn't be
+cd ~/messy-project
+
+# Launch interactive manager
+git-auto ignore-manager
+
+# Select: "📦 Common presets"
+# Choose: "Python" (adds __pycache__/, *.pyc, venv/, etc.)
+
+# Select: "🎯 Browse and select files to ignore"
+# Check these files:
+#   ✓ .env
+#   ✓ local_config.json
+#   ✓ test_output/
+#   ✓ .idea/
+#   ✓ .DS_Store
+
+# Select: "📊 Show current .gitignore"
+# Review: 16 patterns total
+
+# Select: "🧹 Clean: Remove ignored files from git"
+# Confirm: Yes
+# Result: Files removed from git tracking but kept on disk
+
+# Select: "💾 Save and exit"
+# ✓ Saved 16 patterns to .gitignore
+
+# Commit the changes
+git-auto commit "Clean up ignored files"
+git-auto push
+
+# Result: 
+# - .gitignore properly configured
+# - Unwanted files removed from git
+# - Project is cleaner
+```
 ---
 
