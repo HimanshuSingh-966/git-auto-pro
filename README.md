@@ -415,7 +415,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - 🐛 Report bugs: [GitHub Issues](https://github.com/HimanshuSingh-966/git-auto-pro/issues)
 - 💬 Discussions: [GitHub Discussions](https://github.com/HimanshuSingh-966/git-auto-pro/discussions)
-- 📧 Email: your.email@example.com
+- 📧 Email: choudharyhimanshusingh966@gmail.com
 
 ## 🗺️ Roadmap
 
