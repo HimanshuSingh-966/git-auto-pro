@@ -32,12 +32,12 @@ def create_backup(output: Optional[str] = None) -> None:
             
             # Create tar archive
             with tarfile.open(output, "w:gz") as tar:
-                # Add all files except .git/objects to reduce size
+
                 for item in Path.cwd().iterdir():
                     if item.name != ".git":
                         tar.add(item, arcname=item.name)
                 
-                # Add essential .git files
+
                 git_dir = Path(".git")
                 if git_dir.exists():
                     for item in ["config", "HEAD", "refs", "hooks"]:

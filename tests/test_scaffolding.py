@@ -65,7 +65,7 @@ class TestGitignoreGeneration:
         assert gitignore_path.exists()
         content = gitignore_path.read_text()
         assert "__pycache__" in content
-        assert "*.pyc" in content
+        assert "*.py[cod]" in content
         assert "venv/" in content
     
     def test_generate_node_gitignore(self, temp_dir, monkeypatch):
