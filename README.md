@@ -83,7 +83,7 @@ pip install git-auto-pro
 
 ### From Source
 ```bash
-git clone https://github.com/yourusername/git-auto-pro.git
+git clone https://github.com/HimanshuSingh-966/git-auto-pro.git
 cd git-auto-pro
 pip install -e .
 ```
@@ -413,8 +413,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Support
 
-- 🐛 Report bugs: [GitHub Issues](https://github.com/yourusername/git-auto-pro/issues)
-- 💬 Discussions: [GitHub Discussions](https://github.com/yourusername/git-auto-pro/discussions)
+- 🐛 Report bugs: [GitHub Issues](https://github.com/HimanshuSingh-966/git-auto-pro/issues)
+- 💬 Discussions: [GitHub Discussions](https://github.com/HimanshuSingh-966/git-auto-pro/discussions)
 - 📧 Email: your.email@example.com
 
 ## 🗺️ Roadmap
