@@ -90,7 +90,7 @@ pip install git-auto-pro
 
 ### From Source
 ```bash
-git clone https://github.com/yourusername/git-auto-pro.git
+git clone https://github.com/HimanshuSingh-966/git-auto-pro.git
 cd git-auto-pro
 pip install -e .
 ```
