@@ -13,8 +13,8 @@ if ! command -v python3 &> /dev/null; then
 fi
 
 # # Create virtual environment
-# python3 -m venv venv
-# source venv/bin/activate
+python3 -m venv venv
+source venv/bin/activate
 
 # Upgrade pip
 pip install --upgrade pip

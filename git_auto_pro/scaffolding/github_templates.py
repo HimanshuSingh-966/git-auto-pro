@@ -26,15 +26,15 @@ def generate_issue_templates() -> None:
     templates_dir = Path(".github/ISSUE_TEMPLATE")
     templates_dir.mkdir(parents=True, exist_ok=True)
     
-    # Bug report template
+
     (templates_dir / "bug_report.md").write_text(BUG_REPORT_TEMPLATE)
     console.print(f"[green]✓ Created: {templates_dir / 'bug_report.md'}[/green]")
     
-    # Feature request template
+
     (templates_dir / "feature_request.md").write_text(FEATURE_REQUEST_TEMPLATE)
     console.print(f"[green]✓ Created: {templates_dir / 'feature_request.md'}[/green]")
     
-    # Config file for issue templates
+
     (templates_dir / "config.yml").write_text(ISSUE_CONFIG_TEMPLATE)
     console.print(f"[green]✓ Created: {templates_dir / 'config.yml'}[/green]")
     

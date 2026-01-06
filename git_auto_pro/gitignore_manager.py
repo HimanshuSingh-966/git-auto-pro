@@ -1,6 +1,4 @@
-# ============================================================================
-# FILE: git_auto_pro/gitignore_manager.py (NEW FILE)
-# ============================================================================
+
 """Interactive .gitignore file manager."""
 
 from pathlib import Path
@@ -92,7 +90,7 @@ def display_file_tree(files: List[Path], ignored: Set[str]) -> None:
     for file in files[:50]:  # Limit to first 50 for display
         parts = file.parts
         if len(parts) == 1:
-            # Root file
+
             status = "🚫" if should_ignore(file, ignored) else "✅"
             tree.add(f"{status} {file}")
         else:
@@ -122,7 +120,7 @@ def should_ignore(file: Path, patterns: Set[str]) -> bool:
             if file_str.endswith(pattern[1:]):
                 return True
         elif pattern in file_str:
-            # Contains pattern
+
             return True
     
     return False
@@ -323,7 +321,7 @@ def browse_and_select(ignored: Set[str]) -> None:
     
     files = get_all_files()
     
-    # Filter to only show tracked files
+
     tracked_files = [f for f in files if not should_ignore(f, ignored)]
     
     if not tracked_files:
@@ -381,7 +379,7 @@ def clean_ignored_files() -> None:
     if confirm:
         import subprocess
         try:
-            # Remove cached files
+
             result = subprocess.run(
                 ["git", "rm", "-r", "--cached", "."],
                 capture_output=True,

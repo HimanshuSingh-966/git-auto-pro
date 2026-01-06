@@ -14,30 +14,30 @@ console = Console()
 SERVICE_NAME = "git-auto-pro"
 TOKEN_KEY = "github-token"
 
-# Fallback file for environments without keyring support
+
 TOKEN_FILE = Path.home() / ".git-auto-token.json"
 
 
 def _use_file_storage() -> bool:
     """Check if we should use file-based storage."""
     try:
-        # Try to get keyring backend
+
         keyring.get_keyring()
-        # Test if it's the fail backend
+
         test_service = "git-auto-test"
         try:
             keyring.set_password(test_service, "test", "test")
             keyring.delete_password(test_service, "test")
-            return False  # Keyring works
+            return False
         except Exception:
-            return True  # Keyring doesn't work, use file
+            return True
     except Exception:
-        return True  # No keyring available, use file
+        return True
 
 
 def get_stored_token() -> Optional[str]:
     """Retrieve stored GitHub token from keyring or file."""
-    # Try keyring first
+
     if not _use_file_storage():
         try:
             token = keyring.get_password(SERVICE_NAME, TOKEN_KEY)
@@ -46,7 +46,7 @@ def get_stored_token() -> Optional[str]:
         except Exception as e:
             console.print(f"[yellow]Warning: Keyring access failed: {e}[/yellow]")
     
-    # Fallback to file storage
+
     if TOKEN_FILE.exists():
         try:
             data = json.loads(TOKEN_FILE.read_text())
@@ -62,7 +62,7 @@ def store_token(token: str) -> None:
     use_file = _use_file_storage()
     
     if use_file:
-        # Use file-based storage
+
         console.print("[yellow]⚠️  Keyring not available, using file-based storage[/yellow]")
         console.print(f"[dim]Token will be stored in: {TOKEN_FILE}[/dim]")
         
@@ -70,23 +70,23 @@ def store_token(token: str) -> None:
             TOKEN_FILE.parent.mkdir(parents=True, exist_ok=True)
             data = {"token": token}
             TOKEN_FILE.write_text(json.dumps(data, indent=2))
-            # Set restrictive permissions (Unix-like systems)
+
             try:
                 TOKEN_FILE.chmod(0o600)
             except Exception:
-                pass  # Windows doesn't support chmod
+                pass
             console.print("[green]✓ Token stored securely in file[/green]")
         except Exception as e:
             console.print(f"[red]✗ Failed to store token: {e}[/red]")
             raise
     else:
-        # Use keyring storage
+
         try:
             keyring.set_password(SERVICE_NAME, TOKEN_KEY, token)
             console.print("[green]✓ Token stored securely in keyring[/green]")
         except Exception as e:
             console.print(f"[red]✗ Failed to store token in keyring: {e}[/red]")
-            # Fallback to file storage
+
             console.print("[yellow]Falling back to file storage...[/yellow]")
             TOKEN_FILE.parent.mkdir(parents=True, exist_ok=True)
             data = {"token": token}
@@ -194,7 +194,7 @@ def create_github_repo(
         
         console.print(f"[green]✓ Repository created: {repo_data['html_url']}[/green]")
         
-        # Add topics if provided
+
         if topics:
             topics_response = session.put(
                 f"https://api.github.com/repos/{user['login']}/{name}/topics",
@@ -224,11 +224,11 @@ def add_collaborator(
     user = get_current_user()
     
     if not repo:
-        # Try to detect current repo
+
         import git
         try:
             repo_obj = git.Repo(".")
-            # Use getattr to avoid type errors
+
             remotes = getattr(repo_obj, 'remotes')
             origin = getattr(remotes, 'origin')
             remote_url = origin.url
@@ -259,11 +259,11 @@ def protect_branch(
     user = get_current_user()
     
     if not repo:
-        # Try to detect current repo
+
         import git
         try:
             repo_obj = git.Repo(".")
-            # Use getattr to avoid type errors
+
             remotes = getattr(repo_obj, 'remotes')
             origin = getattr(remotes, 'origin')
             remote_url = origin.url
@@ -300,7 +300,7 @@ def protect_branch(
 
 def clear_stored_token() -> None:
     """Clear stored token (for logout/reset)."""
-    # Try keyring first
+
     if not _use_file_storage():
         try:
             keyring.delete_password(SERVICE_NAME, TOKEN_KEY)
@@ -309,7 +309,7 @@ def clear_stored_token() -> None:
         except Exception:
             pass
     
-    # Clear from file
+
     if TOKEN_FILE.exists():
         try:
             TOKEN_FILE.unlink()

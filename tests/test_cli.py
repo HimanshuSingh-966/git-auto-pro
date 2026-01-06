@@ -56,10 +56,10 @@ class TestConfigCommands:
 class TestGitCommands:
     """Test Git operation commands."""
     
-    def test_status_no_repo(self):
+    def test_status_no_repo(self, tmp_path, monkeypatch):
         """Test status command when not in a repo."""
+        monkeypatch.chdir(tmp_path)
         result = runner.invoke(app, ["status"])
-        # Should fail or show appropriate message
         assert "Not a git repository" in result.output or result.exit_code != 0
     
     def test_branch_list_help(self):
