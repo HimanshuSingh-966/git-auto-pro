@@ -8,7 +8,9 @@ from git_auto_pro.git_commands import (
     git_init,
     git_add,
     git_commit,
+    git_pull,
 )
+from unittest.mock import MagicMock, patch
 
 
 class TestRepoOperations:
@@ -101,3 +103,72 @@ class TestGitCommit:
         commits = list(temp_repo.iter_commits())
         assert len(commits) == 1
         assert commits[0].message == "Test commit"
+
+
+class TestGitPull:
+    """Test pull command strategies."""
+
+    def test_pull_default(self, temp_repo, monkeypatch):
+        """Test default pull (merge)."""
+        monkeypatch.chdir(temp_repo.working_dir)
+        
+        with patch('git_auto_pro.git_commands.get_repo') as mock_get_repo:
+            mock_repo = MagicMock()
+            mock_git = MagicMock()
+            mock_repo.git = mock_git
+            mock_get_repo.return_value = mock_repo
+            
+            git_pull()
+            mock_git.pull.assert_called_with("--no-rebase")
+
+    def test_pull_rebase(self, temp_repo, monkeypatch):
+        """Test pull with rebase."""
+        monkeypatch.chdir(temp_repo.working_dir)
+        
+        with patch('git_auto_pro.git_commands.get_repo') as mock_get_repo:
+            mock_repo = MagicMock()
+            mock_git = MagicMock()
+            mock_repo.git = mock_git
+            mock_get_repo.return_value = mock_repo
+            
+            git_pull(rebase=True)
+            mock_git.pull.assert_called_with("--rebase")
+
+    def test_pull_no_rebase(self, temp_repo, monkeypatch):
+        """Test pull with no-rebase."""
+        monkeypatch.chdir(temp_repo.working_dir)
+        
+        with patch('git_auto_pro.git_commands.get_repo') as mock_get_repo:
+            mock_repo = MagicMock()
+            mock_git = MagicMock()
+            mock_repo.git = mock_git
+            mock_get_repo.return_value = mock_repo
+            
+            git_pull(no_rebase=True)
+            mock_git.pull.assert_called_with("--no-rebase")
+
+    def test_pull_ff_only(self, temp_repo, monkeypatch):
+        """Test pull with fast-forward only."""
+        monkeypatch.chdir(temp_repo.working_dir)
+        
+        with patch('git_auto_pro.git_commands.get_repo') as mock_get_repo:
+            mock_repo = MagicMock()
+            mock_git = MagicMock()
+            mock_repo.git = mock_git
+            mock_get_repo.return_value = mock_repo
+            
+            git_pull(ff_only=True)
+            mock_git.pull.assert_called_with("--ff-only")
+
+    def test_pull_branch_rebase(self, temp_repo, monkeypatch):
+        """Test pull specific branch with rebase."""
+        monkeypatch.chdir(temp_repo.working_dir)
+        
+        with patch('git_auto_pro.git_commands.get_repo') as mock_get_repo:
+            mock_repo = MagicMock()
+            mock_git = MagicMock()
+            mock_repo.git = mock_git
+            mock_get_repo.return_value = mock_repo
+            
+            git_pull(branch="main", rebase=True)
+            mock_git.pull.assert_called_with("origin", "main", "--rebase")

@@ -59,6 +59,13 @@ Git-Auto Pro is a powerful command-line tool that automates your entire developm
 - CONTRIBUTING.md generation
 - Standardized collaboration workflows
 
+### 🐛 GitHub Issues
+- Create issues with labels and assignees
+- List and filter issues (open/closed/all)
+- View issue details
+- Close issues with comments
+- Update issue properties
+
 ### 👥 Collaboration
 - Add collaborators to repositories
 - Branch protection rules
@@ -175,8 +182,11 @@ git-auto commit "message" --amend              # Amend last commit
 git-auto push                                  # Push
 git-auto push "message"                        # Add, commit, and push
 git-auto push --force                          # Force push
-git-auto pull                                  # Pull
+git-auto pull                                  # Pull (merge strategy)
 git-auto pull --rebase                         # Pull with rebase
+git-auto pull --no-rebase                      # Pull with merge (default)
+git-auto pull --ff-only                        # Only fast-forward
+git-auto pull -b main --rebase                 # Pull specific branch with rebase
 
 # Status and history
 git-auto status                                # Formatted status
@@ -272,6 +282,28 @@ git-auto hook pre-commit --script custom.sh    # Custom script
 git-auto templates issue                       # Issue templates
 git-auto templates pr                          # PR template
 git-auto templates contributing                # CONTRIBUTING.md
+```
+
+### GitHub Issues
+```bash
+# Create issues
+git-auto issue create                          # Interactive mode
+git-auto issue create --title "Bug fix" --body "Description"
+git-auto issue create -t "Feature" -l "enhancement,priority"
+
+# List issues
+git-auto issue list                            # List open issues
+git-auto issue list --state closed             # List closed issues
+git-auto issue list --state all                # List all issues
+git-auto issue list --labels bug               # Filter by label
+git-auto issue list --assignee username        # Filter by assignee
+
+# View and manage issues
+git-auto issue view 42                         # View issue #42
+git-auto issue close 42                        # Close issue
+git-auto issue close 42 --comment "Fixed"      # Close with comment
+git-auto issue update 42 --title "New title"   # Update issue
+git-auto issue update 42 --state closed        # Change state
 ```
 
 ### Collaboration
@@ -414,7 +446,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 📞 Support
 
 - 🐛 Report bugs: [GitHub Issues](https://github.com/HimanshuSingh-966/git-auto-pro/issues)
-- 💬 Discussions: [GitHub Discussions](https://github.com/HimanshuSingh-966//git-auto-pro/discussions)
+- 💬 Discussions: [GitHub Discussions](https://github.com/HimanshuSingh-966/git-auto-pro/discussions)
 - 📧 Email: choudharyhimanshusingh966@gmail.com
 
 ## 🗺️ Roadmap

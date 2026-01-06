@@ -20,6 +20,7 @@ git-auto-pro/
 │   ├── __init__.py         # Package initialization
 │   ├── cli.py              # CLI interface (Typer commands)
 │   ├── github.py           # GitHub API integration
+│   ├── github_issues.py    # GitHub Issues management
 │   ├── git_commands.py     # Git operations (GitPython)
 │   ├── gitignore_manager.py #Interactive .gitignore Manager
 │   ├── config.py           # Configuration management
@@ -136,14 +137,26 @@ git-auto add --all
 git-auto commit "Test commit"
 ```
 
-### File Management (NEW!)
-````bash
-- ✅ `git-auto ignore-manager` - Interactive .gitignore manager
+### File Management & GitHub Issues
+```bash
+# Interactive .gitignore manager
+git-auto ignore-manager
   - Browse all files in project
   - Select files to ignore with checkboxes
   - Use preset patterns
   - Clean tracked files
-````
+
+# GitHub Issues
+git-auto issue create --title "Bug fix"
+git-auto issue list
+git-auto issue view 42
+git-auto issue close 42
+
+# Pull with divergent branch handling
+git-auto pull --rebase      # Rebase strategy
+git-auto pull --no-rebase   # Merge strategy (default)
+git-auto pull --ff-only     # Fast-forward only
+```
 
 ## 🧪 Testing
 

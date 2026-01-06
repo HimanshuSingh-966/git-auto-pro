@@ -82,11 +82,35 @@ git-auto push "Quick commit and push"
 
 # Pull
 git-auto pull
-git-auto pull --rebase
+git-auto pull --rebase      # Rebase instead of merge
+git-auto pull --no-rebase   # Merge (default)
+git-auto pull --ff-only     # Fast-forward only
+git-auto pull -b main --rebase  # Pull specific branch with rebase
 
 # Log
 git-auto log
 git-auto log --limit 20 --graph
+```
+
+### GitHub Issues
+
+```bash
+# Create issues
+git-auto issue create
+git-auto issue create --title "Bug: Login fails" --body "Description"
+git-auto issue create -t "Feature" -l "enhancement,priority"
+
+# List issues
+git-auto issue list                    # Open issues
+git-auto issue list --state closed     # Closed issues
+git-auto issue list --state all        # All issues
+git-auto issue list --labels bug       # Filter by label
+
+# View and manage
+git-auto issue view 42                 # View issue details
+git-auto issue close 42                # Close issue
+git-auto issue close 42 --comment "Fixed in v1.2"
+git-auto issue update 42 --title "New title"
 ```
 
 ### Branch Management

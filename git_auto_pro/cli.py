@@ -6,6 +6,7 @@ from pathlib import Path
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
+import questionary
 
 # Import submodules
 from .github import (
@@ -13,6 +14,13 @@ from .github import (
     create_github_repo,
     add_collaborator,
     protect_branch,
+)
+from .github_issues import (
+    create_issue,
+    list_issues,
+    get_issue,
+    close_issue,
+    update_issue,
 )
 from .git_commands import (
     git_init,
@@ -159,9 +167,11 @@ def push(
 def pull(
     branch: Optional[str] = typer.Option(None, "--branch", "-b", help="Branch to pull"),
     rebase: bool = typer.Option(False, "--rebase", "-r", help="Rebase instead of merge"),
+    no_rebase: bool = typer.Option(False, "--no-rebase", help="Merge instead of rebase (default)"),
+    ff_only: bool = typer.Option(False, "--ff-only", help="Only allow fast-forward"),
 ):
     """⬇️ Pull changes from remote."""
-    git_pull(branch, rebase)
+    git_pull(branch, rebase, no_rebase, ff_only)
 
 
 @app.command()
@@ -371,6 +381,88 @@ def protect(
 ):
     """🛡️ Setup branch protection rules."""
     protect_branch(branch, repo)
+
+
+# ============================================================================
+# GITHUB ISSUES
+# ============================================================================
+
+issue_app = typer.Typer(help="🐛 GitHub Issues Management")
+app.add_typer(issue_app, name="issue")
+
+
+@issue_app.command("create")
+def issue_create(
+    title: Optional[str] = typer.Option(None, "--title", "-t", help="Issue title"),
+    body: Optional[str] = typer.Option(None, "--body", "-b", help="Issue description"),
+    labels: Optional[str] = typer.Option(None, "--labels", "-l", help="Comma-separated labels"),
+    assignees: Optional[str] = typer.Option(None, "--assignees", "-a", help="Comma-separated assignees"),
+    repo: Optional[str] = typer.Option(None, "--repo", "-r", help="Repository name"),
+):
+    
+    if not title:
+        title = questionary.text("Issue title:").ask()
+        if not title:
+            console.print("[red]✗ Title is required[/red]")
+            return
+    
+    if not body:
+        body = questionary.text("Issue description (optional):").ask()
+    
+    labels_list = [l.strip() for l in labels.split(",")] if labels else None
+    assignees_list = [a.strip() for a in assignees.split(",")] if assignees else None
+    
+    create_issue(title, body, labels_list, assignees_list, repo)
+
+
+@issue_app.command("list")
+def issue_list(
+    state: str = typer.Option("open", "--state", "-s", help="Issue state (open/closed/all)"),
+    labels: Optional[str] = typer.Option(None, "--labels", "-l", help="Filter by labels"),
+    assignee: Optional[str] = typer.Option(None, "--assignee", "-a", help="Filter by assignee"),
+    repo: Optional[str] = typer.Option(None, "--repo", "-r", help="Repository name"),
+    limit: int = typer.Option(30, "--limit", "-n", help="Number of issues to show"),
+):
+    """List GitHub issues."""
+    
+    list_issues(state, labels, assignee, repo, limit)
+
+
+@issue_app.command("view")
+def issue_view(
+    number: int = typer.Argument(..., help="Issue number"),
+    repo: Optional[str] = typer.Option(None, "--repo", "-r", help="Repository name"),
+):
+    """View details of a specific issue."""
+    
+    get_issue(number, repo)
+
+
+@issue_app.command("close")
+def issue_close(
+    number: int = typer.Argument(..., help="Issue number"),
+    comment: Optional[str] = typer.Option(None, "--comment", "-c", help="Closing comment"),
+    repo: Optional[str] = typer.Option(None, "--repo", "-r", help="Repository name"),
+):
+    """Close a GitHub issue."""
+    
+    close_issue(number, comment, repo)
+
+
+@issue_app.command("update")
+def issue_update(
+    number: int = typer.Argument(..., help="Issue number"),
+    title: Optional[str] = typer.Option(None, "--title", "-t", help="New title"),
+    body: Optional[str] = typer.Option(None, "--body", "-b", help="New description"),
+    state: Optional[str] = typer.Option(None, "--state", "-s", help="New state (open/closed)"),
+    labels: Optional[str] = typer.Option(None, "--labels", "-l", help="Comma-separated labels"),
+    repo: Optional[str] = typer.Option(None, "--repo", "-r", help="Repository name"),
+):
+    """Update a GitHub issue."""
+    
+    labels_list = [l.strip() for l in labels.split(",")] if labels else None
+    
+    update_issue(number, title, body, state, labels_list, repo)
 
 
 # ============================================================================

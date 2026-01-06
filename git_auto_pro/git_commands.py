@@ -145,25 +145,44 @@ def git_push(message: Optional[str] = None, branch: str = "main", force: bool = 
         console.print("[yellow]Hint: Make sure remote is configured with 'git-auto init --connect <url>'[/yellow]")
 
 
-def git_pull(branch: Optional[str] = None, rebase: bool = False) -> None:
-    """Pull changes from remote."""
+def git_pull(
+    branch: Optional[str] = None, 
+    rebase: bool = False,
+    no_rebase: bool = False,
+    ff_only: bool = False
+) -> None:
+    """Pull changes from remote with configurable merge strategy."""
     try:
         repo = get_repo()
         git_cmd = getattr(repo, 'git')
         
+        pull_args = []
         if branch:
-            if rebase:
-                git_cmd.pull("origin", branch, rebase=True)
-            else:
-                git_cmd.pull("origin", branch)
-        else:
-            if rebase:
-                git_cmd.pull(rebase=True)
-            else:
-                git_cmd.pull()
+            pull_args.extend(["origin", branch])
         
+        if rebase:
+            pull_args.append("--rebase")
+        elif no_rebase:
+            pull_args.append("--no-rebase")
+        elif ff_only:
+            pull_args.append("--ff-only")
+        else:
+            pull_args.append("--no-rebase")
+        
+        git_cmd.pull(*pull_args)
         console.print("[green]✓ Pulled changes from remote[/green]")
         
+    except git.GitCommandError as e:
+        error_msg = str(e)
+        
+        if "divergent branches" in error_msg or "Need to specify how to reconcile" in error_msg:
+            console.print("[red]✗ Branches have diverged[/red]")
+            console.print("\n[yellow]Choose a reconciliation strategy:[/yellow]")
+            console.print("  [cyan]git-auto pull --rebase[/cyan]      # Rebase your changes on top of remote")
+            console.print("  [cyan]git-auto pull --no-rebase[/cyan]   # Merge remote changes (default)")
+            console.print("  [cyan]git-auto pull --ff-only[/cyan]     # Only fast-forward (fails if not possible)")
+        else:
+            console.print(f"[red]✗ Failed to pull: {e}[/red]")
     except Exception as e:
         console.print(f"[red]✗ Failed to pull: {e}[/red]")
 
