@@ -424,7 +424,7 @@ Available options:
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+Contributions are welcome! Please see [CONTRIBUTING.md](https://github.com/HimanshuSingh-966/git-auto-pro/blob/main/CONTRIBUTING.md) for details.
 
 1. Fork the repository
 2. Create a feature branch (`git-auto switch -c feature/amazing`)
@@ -434,7 +434,7 @@ Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for det
 
 ## 📝 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](https://github.com/HimanshuSingh-966/git-auto-pro/blob/main/LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 
