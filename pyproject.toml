@@ -4,9 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "git-auto-pro"
-version = "1.1.0"
+version = "1.1.1"
 description = "Complete Git + GitHub automation CLI tool with interactive file management"
 authors = [{name = "Himanshu Singh", email = "choudharyhimanshusingh966@gmail.com"}]
+maintainers = [{name = "Himanshu Singh", email = "choudharyhimanshusingh966@gmail.com"}]
 readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
@@ -47,7 +48,7 @@ git-auto = "git_auto_pro.cli:app"
 
 [project.urls]
 Homepage = "https://github.com/HimanshuSingh-966/git-auto-pro"
-Documentation = "https://github.com/HimanshuSingh-966/git-auto-pro#readme"
+Documentation = "https://github.com/HimanshuSingh-966/git-auto-pro/blob/main/README.md"
 Repository = "https://github.com/HimanshuSingh-966/git-auto-pro"
 Issues = "https://github.com/HimanshuSingh-966/git-auto-pro/issues"
 
