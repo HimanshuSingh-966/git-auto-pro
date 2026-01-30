@@ -198,8 +198,8 @@ bash scripts/install.sh
 
 If issues persist:
 
-1. Check [GitHub Issues](https://github.com/yourusername/git-auto-pro/issues)
-2. Search [Discussions](https://github.com/yourusername/git-auto-pro/discussions)
+1. Check [GitHub Issues](https://github.com/HimanshuSingh-966/git-auto-pro/issues)
+2. Search [Discussions](https://github.com/HimanshuSingh-966/git-auto-pro/discussions)
 3. Open a new issue with:
    - Your OS and Python version
    - Error message or logs
