@@ -8,13 +8,13 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="git-auto-pro",
-    version="1.0.0",
-    author="Your Name",
-    author_email="your.email@example.com",
+    version="1.1.1",
+    author="Himanshu Singh",
+    author_email="choudharyhimanshusingh966@gmail.com",
     description="Complete Git + GitHub automation CLI tool",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/yourusername/git-auto-pro",
+    url="https://github.com/HimanshuSingh-966/git-auto-pro",
     packages=find_packages(),
     classifiers=[
         "Development Status :: 4 - Beta",
