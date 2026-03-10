@@ -20,6 +20,10 @@ DEFAULT_CONFIG = {
     "editor": "nano",
     "git_user_name": "",
     "git_user_email": "",
+    "safe_mode": False,
+    "test_branch_prefix": "test",
+    "auto_create_pr": True,
+    "pr_base_branch": "main",
 }
 
 

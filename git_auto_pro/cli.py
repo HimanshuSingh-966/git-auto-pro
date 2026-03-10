@@ -38,12 +38,14 @@ from .git_commands import (
     git_merge,
     git_clone,
     git_stats,
+    git_undo,
 )
 from .config import (
     get_config,
     set_config,
     list_config,
     reset_config,
+    load_config,
 )
 from .scaffolding.project import create_new_project
 from .scaffolding.readme import generate_readme
@@ -145,22 +147,44 @@ def add(
 
 @app.command()
 def commit(
-    message: str = typer.Argument(..., help="Commit message"),
+    message: Optional[str] = typer.Argument(None, help="Commit message"),
     conventional: bool = typer.Option(False, "--conventional", "-c", help="Use conventional commit format"),
     amend: bool = typer.Option(False, "--amend", help="Amend previous commit"),
+    safe: bool = typer.Option(False, "--safe", help="Use safe commit flow (test branch + PR)"),
 ):
     """💾 Commit staged changes."""
-    git_commit(message, conventional, amend)
+    config = load_config()
+    use_safe = safe or config.get("safe_mode", False)
+    
+    if use_safe:
+        if not message:
+            console.print("[red]✗ Commit message required for safe mode[/red]")
+            raise typer.Exit(1)
+        from .commands.safe_flow import safe_push
+        safe_push(message)
+    else:
+        if not message:
+            console.print("[red]✗ Commit message required[/red]")
+            raise typer.Exit(1)
+        git_commit(message, conventional, amend)
 
 
 @app.command()
 def push(
     message: Optional[str] = typer.Argument(None, help="Commit message (auto add + commit + push)"),
-    branch: str = typer.Option("main", "--branch", "-b", help="Branch to push"),
+    branch: Optional[str] = typer.Option(None, "--branch", "-b", help="Branch to push (default: from config)"),
     force: bool = typer.Option(False, "--force", "-f", help="Force push"),
+    safe: bool = typer.Option(False, "--safe", help="Use safe commit flow (test branch + PR)"),
 ):
     """⬆️ Push commits to remote."""
-    git_push(message, branch, force)
+    config = load_config()
+    use_safe = safe or config.get("safe_mode", False)
+    
+    if use_safe and message:
+        from .commands.safe_flow import safe_push
+        safe_push(message)
+    else:
+        git_push(message, branch, force)
 
 
 @app.command()
@@ -561,6 +585,122 @@ def ignore_manager():
     from .gitignore_manager import interactive_gitignore_manager
     
     interactive_gitignore_manager()
+
+
+# ============================================================================
+# UNDO COMMAND
+# ============================================================================
+
+@app.command()
+def undo(
+    hard: bool = typer.Option(False, "--hard", help="Hard reset: discard all changes"),
+    push_flag: bool = typer.Option(False, "--push", help="Soft undo + force push"),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt"),
+):
+    """⏪ Undo last commit."""
+    git_undo(hard=hard, force_push=push_flag, confirm=yes)
+
+
+# ============================================================================
+# RELEASE COMMAND
+# ============================================================================
+
+@app.command()
+def release(
+    version: str = typer.Argument(..., help="Version (1.2.0) or bump type (patch/minor/major)"),
+    draft: bool = typer.Option(False, "--draft", help="Create draft release"),
+    notes: Optional[str] = typer.Option(None, "--notes", "-n", help="Release notes"),
+):
+    """🚀 Create a release — tag, push, and GitHub release."""
+    from .commands.release import create_release
+    create_release(version, draft, notes)
+
+
+# ============================================================================
+# DOCTOR COMMAND
+# ============================================================================
+
+@app.command()
+def doctor():
+    """🩺 Run system diagnostics."""
+    from .commands.doctor import run_diagnostics
+    run_diagnostics()
+
+
+# ============================================================================
+# PR COMMANDS
+# ============================================================================
+
+@app.command()
+def pr(
+    title: str = typer.Argument(..., help="PR title"),
+    draft: bool = typer.Option(False, "--draft", help="Create draft PR"),
+    reviewer: Optional[List[str]] = typer.Option(None, "--reviewer", "-r", help="Request reviewer"),
+    label: Optional[List[str]] = typer.Option(None, "--label", "-l", help="Add label"),
+    base: Optional[str] = typer.Option(None, "--base", "-b", help="Base branch (default: from config)"),
+):
+    """📋 Create a Pull Request from current branch."""
+    from .github_pr.pr_manager import create_pull_request
+    from .config import get_default_branch
+    import git
+    
+    try:
+        repo = git.Repo(".", search_parent_directories=True)
+        head = str(repo.active_branch)
+        base_branch = base or load_config().get("pr_base_branch", get_default_branch())
+        
+        if head == base_branch:
+            console.print(f"[red]✗ You're on '{head}' — switch to a feature branch first.[/red]")
+            raise typer.Exit(1)
+        
+        create_pull_request(
+            head=head,
+            base=base_branch,
+            title=title,
+            draft=draft,
+            reviewers=reviewer,
+            labels=label,
+        )
+    except git.InvalidGitRepositoryError:
+        console.print("[red]✗ Not a git repository.[/red]")
+
+
+@app.command()
+def prs(
+    state: str = typer.Option("open", "--state", "-s", help="PR state (open/closed/all)"),
+):
+    """📋 List pull requests for current repo."""
+    from .github_pr.pr_manager import list_pull_requests
+    list_pull_requests(state)
+
+
+@app.command(name="merge-pr")
+def merge_pr(
+    number: int = typer.Argument(..., help="PR number to merge"),
+    squash: bool = typer.Option(False, "--squash", help="Squash merge"),
+    rebase: bool = typer.Option(False, "--rebase", help="Rebase merge"),
+):
+    """🔗 Merge a pull request by number."""
+    from .github_pr.pr_manager import merge_pull_request
+    
+    if squash:
+        method = "squash"
+    elif rebase:
+        method = "rebase"
+    else:
+        method = "merge"
+    
+    merge_pull_request(number, method)
+
+
+@app.command(name="review-pr")
+def review_pr(
+    number: int = typer.Argument(..., help="PR number to review"),
+):
+    """👀 Open a PR in the browser for review."""
+    from .github_pr.pr_manager import review_pr_in_browser
+    review_pr_in_browser(number)
+
 
 if __name__ == "__main__":
     app()

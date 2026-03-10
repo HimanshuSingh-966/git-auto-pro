@@ -49,7 +49,8 @@ def create_issue(
     try:
         response = session.post(
             f"https://api.github.com/repos/{user['login']}/{repo}/issues",
-            json=data
+            json=data,
+            timeout=10
         )
         response.raise_for_status()
         issue_data = response.json()
@@ -59,6 +60,9 @@ def create_issue(
         
         return issue_data
         
+    except (requests.ConnectionError, requests.Timeout):
+        console.print("[red]✗ Cannot reach GitHub API — check your internet connection.[/red]")
+        return {}
     except requests.exceptions.HTTPError as e:
         console.print(f"[red]✗ Failed to create issue: {e}[/red]")
         raise
@@ -104,7 +108,8 @@ def list_issues(
     try:
         response = session.get(
             f"https://api.github.com/repos/{user['login']}/{repo}/issues",
-            params=params
+            params=params,
+            timeout=10
         )
         response.raise_for_status()
         issues = response.json()
@@ -133,6 +138,9 @@ def list_issues(
         
         return issues
         
+    except (requests.ConnectionError, requests.Timeout):
+        console.print("[red]✗ Cannot reach GitHub API — check your internet connection.[/red]")
+        return []
     except requests.exceptions.HTTPError as e:
         console.print(f"[red]✗ Failed to list issues: {e}[/red]")
         return []
@@ -159,7 +167,8 @@ def get_issue(number: int, repo: Optional[str] = None) -> Optional[Dict]:
     
     try:
         response = session.get(
-            f"https://api.github.com/repos/{user['login']}/{repo}/issues/{number}"
+            f"https://api.github.com/repos/{user['login']}/{repo}/issues/{number}",
+            timeout=10
         )
         response.raise_for_status()
         issue = response.json()
@@ -184,6 +193,9 @@ def get_issue(number: int, repo: Optional[str] = None) -> Optional[Dict]:
         
         return issue
         
+    except (requests.ConnectionError, requests.Timeout):
+        console.print("[red]✗ Cannot reach GitHub API — check your internet connection.[/red]")
+        return None
     except requests.exceptions.HTTPError as e:
         console.print(f"[red]✗ Failed to get issue: {e}[/red]")
         return None

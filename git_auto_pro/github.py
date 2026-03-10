@@ -13,6 +13,30 @@ console = Console()
 
 SERVICE_NAME = "git-auto-pro"
 TOKEN_KEY = "github-token"
+GITHUB_API_URL = "https://api.github.com"
+
+
+def check_api_connectivity() -> bool:
+    """Check if GitHub API is reachable."""
+    try:
+        response = requests.head(GITHUB_API_URL, timeout=5)
+        return response.status_code < 500
+    except (requests.ConnectionError, requests.Timeout):
+        return False
+    except Exception:
+        return False
+
+
+def _handle_api_error(operation: str, error: Exception) -> None:
+    """Handle API errors with user-friendly messages."""
+    if isinstance(error, (requests.ConnectionError, requests.Timeout)):
+        console.print(f"[red]✗ {operation}: Cannot reach GitHub API — check your internet connection.[/red]")
+        console.print("[yellow]→ Local Git operations still work. GitHub features require connectivity.[/yellow]")
+    elif isinstance(error, requests.exceptions.HTTPError):
+        status = getattr(error.response, 'status_code', 'unknown')
+        console.print(f"[red]✗ {operation}: GitHub API returned HTTP {status}[/red]")
+    else:
+        console.print(f"[red]✗ {operation}: {error}[/red]")
 
 
 TOKEN_FILE = Path.home() / ".git-auto-token.json"
@@ -106,7 +130,7 @@ def validate_token(token: str) -> bool:
     }
     
     try:
-        response = requests.get("https://api.github.com/user", headers=headers)
+        response = requests.get(f"{GITHUB_API_URL}/user", headers=headers, timeout=10)
         if response.status_code == 200:
             user_data = response.json()
             console.print(f"[green]✓ Authenticated as: {user_data['login']}[/green]")
@@ -114,6 +138,9 @@ def validate_token(token: str) -> bool:
         else:
             console.print(f"[red]✗ Invalid token: {response.status_code}[/red]")
             return False
+    except (requests.ConnectionError, requests.Timeout):
+        console.print("[red]✗ Cannot reach GitHub API — check your internet connection.[/red]")
+        return False
     except Exception as e:
         console.print(f"[red]✗ Validation failed: {e}[/red]")
         return False
@@ -156,10 +183,17 @@ def get_authenticated_session() -> requests.Session:
 
 def get_current_user() -> Dict:
     """Get current authenticated user information."""
-    session = get_authenticated_session()
-    response = session.get("https://api.github.com/user")
-    response.raise_for_status()
-    return response.json()
+    try:
+        session = get_authenticated_session()
+        response = session.get(f"{GITHUB_API_URL}/user", timeout=10)
+        response.raise_for_status()
+        return response.json()
+    except (requests.ConnectionError, requests.Timeout) as e:
+        _handle_api_error("Get user info", e)
+        raise
+    except Exception as e:
+        _handle_api_error("Get user info", e)
+        raise
 
 
 def create_github_repo(
@@ -188,7 +222,7 @@ def create_github_repo(
         data["homepage"] = homepage
     
     try:
-        response = session.post("https://api.github.com/user/repos", json=data)
+        response = session.post(f"{GITHUB_API_URL}/user/repos", json=data, timeout=10)
         response.raise_for_status()
         repo_data = response.json()
         
@@ -197,9 +231,10 @@ def create_github_repo(
 
         if topics:
             topics_response = session.put(
-                f"https://api.github.com/repos/{user['login']}/{name}/topics",
+                f"{GITHUB_API_URL}/repos/{user['login']}/{name}/topics",
                 json={"names": topics},
-                headers={"Accept": "application/vnd.github.mercy-preview+json"}
+                headers={"Accept": "application/vnd.github.mercy-preview+json"},
+                timeout=10
             )
             if topics_response.status_code == 200:
                 console.print(f"[green]✓ Topics added: {', '.join(topics)}[/green]")
@@ -210,7 +245,10 @@ def create_github_repo(
         if e.response.status_code == 422:
             console.print(f"[red]✗ Repository '{name}' already exists[/red]")
         else:
-            console.print(f"[red]✗ Failed to create repository: {e}[/red]")
+            _handle_api_error("Create repository", e)
+        raise
+    except (requests.ConnectionError, requests.Timeout) as e:
+        _handle_api_error("Create repository", e)
         raise
 
 
@@ -288,12 +326,15 @@ def protect_branch(
     
     try:
         response = session.put(
-            f"https://api.github.com/repos/{user['login']}/{repo}/branches/{branch}/protection",
+            f"{GITHUB_API_URL}/repos/{user['login']}/{repo}/branches/{branch}/protection",
             json=protection_data,
-            headers={"Accept": "application/vnd.github.luke-cage-preview+json"}
+            headers={"Accept": "application/vnd.github.luke-cage-preview+json"},
+            timeout=10
         )
         response.raise_for_status()
         console.print(f"[green]✓ Branch protection enabled for '{branch}'[/green]")
+    except (requests.ConnectionError, requests.Timeout) as e:
+        _handle_api_error("Protect branch", e)
     except Exception as e:
         console.print(f"[red]✗ Failed to protect branch: {e}[/red]")
 

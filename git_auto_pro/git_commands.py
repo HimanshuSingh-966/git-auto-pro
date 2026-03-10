@@ -1,13 +1,16 @@
 """Git command operations using GitPython."""
 
 import git
+import typer
 from typing import Optional, List, Any
 from pathlib import Path
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
+from rich.prompt import Confirm
 from datetime import datetime
 import questionary
+from .config import get_default_branch
 
 console = Console()
 
@@ -80,10 +83,39 @@ def git_add(files: Optional[List[str]] = None, all: bool = False) -> None:
         console.print(f"[red]✗ Failed to stage files: {e}[/red]")
 
 
+def _check_staging_area(repo: git.Repo) -> bool:
+    """Check if staging area has changes. Returns True if there are staged changes."""
+    try:
+        staged = repo.index.diff("HEAD")
+    except git.BadName:
+        # New repo with no commits — if index has entries, files are staged
+        if repo.index.entries:
+            return True
+        return False
+    
+    if staged:
+        return True
+    
+    # Check for newly added files that show no diff against HEAD
+    try:
+        staged_new = repo.git.diff("--cached", "--name-only")
+        if staged_new.strip():
+            return True
+    except git.GitCommandError:
+        pass
+    
+    return False
+
+
 def git_commit(message: str, conventional: bool = False, amend: bool = False) -> None:
     """Commit staged changes."""
     try:
         repo = get_repo()
+        
+        # Empty commit guard
+        if not amend and not _check_staging_area(repo):
+            console.print("[yellow]⚠ Nothing staged. Use 'git-auto add' first.[/yellow]")
+            raise typer.Exit()
         
         if conventional:
             commit_type = questionary.select(
@@ -111,19 +143,31 @@ def git_commit(message: str, conventional: bool = False, amend: bool = False) ->
             repo.index.commit(message)
             console.print(f"[green]✓ Committed: {message}[/green]")
             
+    except typer.Exit:
+        raise
     except Exception as e:
         console.print(f"[red]✗ Failed to commit: {e}[/red]")
 
 
-def git_push(message: Optional[str] = None, branch: str = "main", force: bool = False) -> None:
+def git_push(message: Optional[str] = None, branch: Optional[str] = None, force: bool = False) -> None:
     """Push commits to remote."""
     try:
         repo = get_repo()
         git_cmd = getattr(repo, 'git')
         
+        # Resolve branch from config if not provided
+        if branch is None:
+            branch = get_default_branch()
+        
         # If message provided, do add + commit + push
         if message:
             git_cmd.add(A=True)
+            
+            # Empty commit guard
+            if not _check_staging_area(repo):
+                console.print("[yellow]⚠ Nothing staged. Use 'git-auto add' first.[/yellow]")
+                raise typer.Exit()
+            
             repo.index.commit(message)
             console.print(f"[green]✓ Committed: {message}[/green]")
         
@@ -140,6 +184,16 @@ def git_push(message: Optional[str] = None, branch: str = "main", force: bool = 
             git_cmd.push("origin", branch)
             console.print(f"[green]✓ Pushed to {branch}[/green]")
             
+    except typer.Exit:
+        raise
+    except git.GitCommandError as e:
+        error_msg = str(e).lower()
+        if "rejected" in error_msg or "fetch first" in error_msg:
+            console.print("[red]✗ Push rejected — remote has changes you don't have locally.[/red]")
+            console.print("[yellow]→ Run: git-auto pull --rebase   then try again.[/yellow]")
+        else:
+            console.print(f"[red]✗ Failed to push: {e}[/red]")
+            console.print("[yellow]Hint: Make sure remote is configured with 'git-auto init --connect <url>'[/yellow]")
     except Exception as e:
         console.print(f"[red]✗ Failed to push: {e}[/red]")
         console.print("[yellow]Hint: Make sure remote is configured with 'git-auto init --connect <url>'[/yellow]")
@@ -443,3 +497,50 @@ def git_stats(detailed: bool = False) -> None:
             
     except Exception as e:
         console.print(f"[red]✗ Failed to get stats: {e}[/red]")
+
+
+def git_undo(hard: bool = False, force_push: bool = False, confirm: bool = False) -> None:
+    """Undo last commit with various strategies."""
+    try:
+        repo = get_repo()
+        git_cmd = getattr(repo, 'git')
+        
+        # Safety check — need at least one commit
+        try:
+            list(repo.iter_commits(max_count=1))
+        except Exception:
+            console.print("[red]✗ No commits to undo[/red]")
+            return
+        
+        if hard:
+            if not confirm:
+                console.print("[yellow]⚠  This will permanently discard changes.[/yellow]")
+                if not Confirm.ask("Type 'yes' to confirm", default=False):
+                    console.print("[yellow]Cancelled[/yellow]")
+                    return
+            git_cmd.reset("--hard", "HEAD~1")
+            console.print("[green]✓ Hard reset: last commit and all changes discarded[/green]")
+            
+        elif force_push:
+            if not confirm:
+                console.print("[yellow]⚠  This will undo the last commit AND force push to remote.[/yellow]")
+                if not Confirm.ask("Type 'yes' to confirm", default=False):
+                    console.print("[yellow]Cancelled[/yellow]")
+                    return
+            git_cmd.reset("--soft", "HEAD~1")
+            console.print("[green]✓ Soft reset: last commit undone, changes kept staged[/green]")
+            
+            # Force push
+            if repo.remotes:
+                branch = str(repo.active_branch)
+                git_cmd.push("origin", branch, "--force")
+                console.print(f"[yellow]⚠ Force pushed to {branch}[/yellow]")
+            else:
+                console.print("[yellow]⚠ No remote configured — skipped force push[/yellow]")
+        else:
+            # Default: soft reset
+            git_cmd.reset("--soft", "HEAD~1")
+            console.print("[green]✓ Soft reset: last commit undone, changes kept staged[/green]")
+            
+    except Exception as e:
+        console.print(f"[red]✗ Failed to undo: {e}[/red]")

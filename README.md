@@ -66,6 +66,24 @@ Git-Auto Pro is a powerful command-line tool that automates your entire developm
 - Close issues with comments
 - Update issue properties
 
+### 🛡️ Safe Commit Flow (v2.0)
+- Push to test branches automatically (`--safe` flag)
+- Auto-create Pull Requests with review checklists
+- Branch collision detection with timestamp fallback
+- Configurable via settings (`safe_mode`, `test_branch_prefix`)
+
+### ⏪ Undo & Release (v2.0)
+- `git-auto undo` — Soft/hard reset with confirmation prompts
+- `git-auto release` — Tag, bump version, push, create GitHub releases
+- Canonical version source from `pyproject.toml`
+
+### 🩺 Diagnostics (v2.0)
+- `git-auto doctor` — Git, Python, token, remote, branch consistency checks
+
+### 📋 Pull Request Management (v2.0)
+- Create, list, merge, and review PRs from CLI
+- Supports `--draft`, `--reviewer`, `--label`, `--squash`, `--rebase`
+
 ### 👥 Collaboration
 - Add collaborators to repositories
 - Branch protection rules
@@ -182,7 +200,9 @@ git-auto commit "message" --amend              # Amend last commit
 git-auto push                                  # Push
 git-auto push "message"                        # Add, commit, and push
 git-auto push --force                          # Force push
+git-auto push --safe "message"                 # Safe commit flow (test branch + PR)
 git-auto pull                                  # Pull (merge strategy)
+git-auto pull --rebase                         # Pull with rebase
 git-auto pull --rebase                         # Pull with rebase
 git-auto pull --no-rebase                      # Pull with merge (default)
 git-auto pull --ff-only                        # Only fast-forward
@@ -342,6 +362,40 @@ git-auto --help                                # Show help
 git-auto COMMAND --help                        # Command-specific help
 ```
 
+### Undo
+```bash
+git-auto undo                                  # Soft reset (keep changes staged)
+git-auto undo --hard --yes                     # Hard reset (discard changes)
+git-auto undo --push --yes                     # Soft reset + force push
+```
+
+### Release
+```bash
+git-auto release patch                         # Bump patch version
+git-auto release minor                         # Bump minor version
+git-auto release major                         # Bump major version
+git-auto release 2.1.0                         # Set exact version
+git-auto release patch --draft                 # Create draft release
+git-auto release minor --notes "Custom notes"  # With release notes
+```
+
+### Doctor
+```bash
+git-auto doctor                                # Run all diagnostics
+```
+
+### Pull Requests
+```bash
+git-auto pr "Fix login bug"                    # Create PR from current branch
+git-auto pr "Feature" --draft                  # Create draft PR
+git-auto pr "Fix" --reviewer user1 --label bug # With reviewer and label
+git-auto prs                                   # List open PRs
+git-auto prs --state closed                    # List closed PRs
+git-auto merge-pr 42                           # Merge PR
+git-auto merge-pr 42 --squash                  # Squash merge
+git-auto review-pr 42                          # Open PR in browser
+```
+
 ## 🎯 Use Cases
 
 ### Starting a New Python Project
@@ -421,6 +475,10 @@ Available options:
 - `editor`: Default text editor
 - `git_user_name`: Git username
 - `git_user_email`: Git email
+- `safe_mode`: Enable safe commit flow by default (default: `false`)
+- `test_branch_prefix`: Prefix for test branches (default: `test`)
+- `auto_create_pr`: Auto-create PR on safe push (default: `true`)
+- `pr_base_branch`: Base branch for PRs (default: `main`)
 
 ## 🤝 Contributing
 
