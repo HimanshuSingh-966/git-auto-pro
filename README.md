@@ -8,6 +8,18 @@ Git-Auto Pro is a powerful command-line tool that automates your entire developm
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![PyPI](https://img.shields.io/badge/pypi-git--auto--pro-orange.svg)](https://pypi.org/project/git-auto-pro/)
 
+## 🆕 What's New in 2.5.0
+
+- **Org/fork repo support** — GitHub commands (`issue`, `pr`, `prs`, `merge-pr`, `review-pr`, `collab`, `protect`) now detect the repository **owner** from your `origin` remote instead of assuming it's your own. They work on organization, fork, and collaborator repos. Pass `--repo owner/name` to target any repo explicitly.
+- **`git-auto new` honors `default_branch`** — no longer hardcodes `main`; aligns the local branch to your configured default before pushing.
+- **Real backups** — `git-auto backup` now archives the full `.git` (including `objects/`), so `git-auto restore` actually brings back your history.
+- **Portable generated hooks** — `pre-commit`/`pre-push` hooks are now POSIX-`sh` safe and no longer break on `dash` (`/bin/sh` on Ubuntu/Debian) when ruff/black/pytest aren't installed.
+- **Honest PR feedback** — `git-auto pr` no longer claims "✓ Reviewers requested" when the API rejected the request; it reports the real HTTP status.
+- **Tougher network handling** — `issue close`/`update` and all PR ops now handle connection errors and timeouts gracefully instead of dumping a traceback.
+- **Modern GitHub auth** — `Bearer` tokens, current API media type, and version header; deprecated preview headers removed.
+
+See the [CHANGELOG](CHANGELOG.md) for the full list.
+
 ## ✨ Features
 
 ### 🔐 GitHub Authentication
@@ -203,7 +215,6 @@ git-auto push --force                          # Force push
 git-auto push --safe "message"                 # Safe commit flow (test branch + PR)
 git-auto pull                                  # Pull (merge strategy)
 git-auto pull --rebase                         # Pull with rebase
-git-auto pull --rebase                         # Pull with rebase
 git-auto pull --no-rebase                      # Pull with merge (default)
 git-auto pull --ff-only                        # Only fast-forward
 git-auto pull -b main --rebase                 # Pull specific branch with rebase
@@ -326,17 +337,24 @@ git-auto issue update 42 --title "New title"   # Update issue
 git-auto issue update 42 --state closed        # Change state
 ```
 
+> **Note:** Add `--repo owner/name` to target any repository you have access to.
+> Without it, the owner is detected from your `origin` remote (works for org/fork repos).
+
 ### Collaboration
 ```bash
 # Add collaborators
-git-auto collab username                       # Add to current repo
-git-auto collab username --repo myrepo         # Add to specific repo
+git-auto collab username                       # Add to current repo (owner auto-detected)
+git-auto collab username --repo owner/name     # Target any repo you have access to
 git-auto collab username --permission admin    # With permission level
 
 # Branch protection
 git-auto protect main                          # Protect main branch
-git-auto protect develop --repo myrepo         # Protect specific branch
+git-auto protect develop --repo owner/name     # Protect a branch in a specific repo
 ```
+
+> **Note:** The owner is detected from your `origin` remote, so these work for
+> organization, fork, and collaborator repos — not just repos you own. Use
+> `--repo owner/name` to override.
 
 ### Backup & Restore
 ```bash
@@ -395,6 +413,9 @@ git-auto merge-pr 42                           # Merge PR
 git-auto merge-pr 42 --squash                  # Squash merge
 git-auto review-pr 42                          # Open PR in browser
 ```
+
+> **Note:** PR commands detect the owner from your `origin` remote, so they work
+> for organization and fork repos. Pass `--repo owner/name` to override.
 
 ## 🎯 Use Cases
 

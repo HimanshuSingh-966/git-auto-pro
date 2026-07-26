@@ -18,11 +18,12 @@ def create_new_project(
     """Create a complete new project."""
     from ..git_commands import git_init, git_add, git_commit, git_push
     from ..github import create_github_repo, get_current_user
+    from ..config import get_default_branch
     from .readme import generate_readme
     from .license import generate_license
     from .gitignore import generate_gitignore
     from .templates import generate_template
-    
+
     console.print(f"[bold cyan]✨ Creating project: {project_name}[/bold cyan]\n")
     
     # Create project directory
@@ -66,15 +67,26 @@ def create_new_project(
                     private=private,
                     description=f"Project: {project_name}",
                 )
-                
+
                 # Connect to remote
                 import git
                 repo = git.Repo(".")
+
+                # Align the local branch with the configured default branch
+                # before pushing, so the push target actually exists locally
+                # (git's own initial branch may be master/main depending on
+                # version/config).
+                default_branch = get_default_branch()
+                try:
+                    repo.git.branch("-M", default_branch)
+                except Exception:
+                    pass
+
                 repo.create_remote("origin", repo_data["clone_url"])
-                
+
                 progress.update(task, description="Pushing to GitHub...")
-                git_push(branch="main")
-                
+                git_push(branch=default_branch)
+
             except Exception as e:
                 console.print(f"[yellow]⚠ Could not create GitHub repo: {e}[/yellow]")
     
