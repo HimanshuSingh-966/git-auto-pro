@@ -4,7 +4,7 @@ import requests
 import keyring
 from pathlib import Path
 import json
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Tuple
 from rich.console import Console
 from rich.prompt import Prompt, Confirm
 import questionary
@@ -37,6 +37,96 @@ def _handle_api_error(operation: str, error: Exception) -> None:
         console.print(f"[red]✗ {operation}: GitHub API returned HTTP {status}[/red]")
     else:
         console.print(f"[red]✗ {operation}: {error}[/red]")
+
+
+def _auth_headers(token: str) -> Dict[str, str]:
+    """Build standard auth headers for a GitHub API request."""
+    return {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+
+
+def parse_remote_url(url: str) -> Tuple[Optional[str], Optional[str]]:
+    """Parse (owner, repo) from a GitHub remote URL.
+
+    Supports HTTPS (https://github.com/owner/repo[.git]), scp-like SSH
+    (git@github.com:owner/repo[.git]), and ssh:// / git:// forms.
+    Returns (owner, repo) with any trailing '.git' stripped, or
+    (None, None) if the URL cannot be parsed.
+    """
+    url = url.strip()
+    if url.endswith(".git"):
+        url = url[:-4]
+    url = url.rstrip("/")
+
+    # scp-like form: git@github.com:owner/repo  (no "://", but has a ":")
+    if "://" not in url and ":" in url:
+        path = url.split(":", 1)[1]
+    elif "://" in url:
+        # strip scheme + userinfo/host, keep the owner/repo path
+        rest = url.split("://", 1)[1]
+        path = rest.split("/", 1)[1] if "/" in rest else ""
+    else:
+        path = url
+
+    parts = [p for p in path.split("/") if p] if path else []
+    if len(parts) >= 2:
+        return parts[-2], parts[-1]
+    if len(parts) == 1:
+        return None, parts[-1]
+    return None, None
+
+
+def detect_repo_from_remote() -> Tuple[str, str]:
+    """Detect (owner, repo) from the local git origin remote.
+
+    Raises RuntimeError with a user-friendly message if not a git repo,
+    no origin remote, or the URL can't be parsed.
+    """
+    import git
+    try:
+        repo_obj = git.Repo(".", search_parent_directories=True)
+    except Exception as e:
+        raise RuntimeError(
+            "Not a git repository. Use --repo owner/name to specify one."
+        ) from e
+    remotes = getattr(repo_obj, "remotes", None)
+    if not remotes or not hasattr(remotes, "origin"):
+        raise RuntimeError(
+            "No 'origin' remote configured. Use --repo owner/name to specify one."
+        )
+    origin = remotes.origin
+    try:
+        remote_url = origin.url
+    except Exception as e:
+        raise RuntimeError(
+            "No URL configured for 'origin' remote. Use --repo owner/name to specify one."
+        ) from e
+    owner, name = parse_remote_url(remote_url)
+    if not owner or not name:
+        raise RuntimeError(
+            f"Could not parse GitHub owner/repo from remote URL: {remote_url!r}. "
+            "Use --repo owner/name to specify one."
+        )
+    return owner, name
+
+
+def resolve_repo_ref(repo: Optional[str] = None) -> Tuple[str, str]:
+    """Resolve (owner, repo_name) for a GitHub API call.
+
+    - repo="owner/name"  -> ("owner", "name")
+    - repo="name" (bare) -> (authenticated_user, "name")   [legacy behavior]
+    - repo=None          -> detect owner+name from the local origin remote
+    """
+    if repo:
+        if "/" in repo:
+            owner, name = repo.split("/", 1)
+            return owner.strip(), name.strip()
+        user = get_current_user()
+        return user["login"], repo.strip()
+    return detect_repo_from_remote()
 
 
 TOKEN_FILE = Path.home() / ".git-auto-token.json"
@@ -124,11 +214,8 @@ def store_token(token: str) -> None:
 
 def validate_token(token: str) -> bool:
     """Validate GitHub token using API."""
-    headers = {
-        "Authorization": f"token {token}",
-        "Accept": "application/vnd.github.v3+json"
-    }
-    
+    headers = _auth_headers(token)
+
     try:
         response = requests.get(f"{GITHUB_API_URL}/user", headers=headers, timeout=10)
         if response.status_code == 200:
@@ -174,10 +261,7 @@ def get_authenticated_session() -> requests.Session:
         raise ValueError("Not authenticated")
     
     session = requests.Session()
-    session.headers.update({
-        "Authorization": f"token {token}",
-        "Accept": "application/vnd.github.v3+json"
-    })
+    session.headers.update(_auth_headers(token))
     return session
 
 
@@ -233,11 +317,14 @@ def create_github_repo(
             topics_response = session.put(
                 f"{GITHUB_API_URL}/repos/{user['login']}/{name}/topics",
                 json={"names": topics},
-                headers={"Accept": "application/vnd.github.mercy-preview+json"},
                 timeout=10
             )
             if topics_response.status_code == 200:
                 console.print(f"[green]✓ Topics added: {', '.join(topics)}[/green]")
+            else:
+                console.print(
+                    f"[yellow]⚠ Topics not added (HTTP {topics_response.status_code})[/yellow]"
+                )
         
         return repo_data
         
@@ -259,31 +346,31 @@ def add_collaborator(
 ) -> None:
     """Add a collaborator to a repository."""
     session = get_authenticated_session()
-    user = get_current_user()
-    
-    if not repo:
 
-        import git
-        try:
-            repo_obj = git.Repo(".")
+    try:
+        owner, repo_name = resolve_repo_ref(repo)
+    except RuntimeError as e:
+        console.print(f"[red]✗ {e}[/red]")
+        return
 
-            remotes = getattr(repo_obj, 'remotes')
-            origin = getattr(remotes, 'origin')
-            remote_url = origin.url
-            repo = remote_url.split("/")[-1].replace(".git", "")
-        except:
-            console.print("[red]✗ Could not detect repository. Use --repo option.[/red]")
-            return
-    
-    console.print(f"[cyan]Adding {username} as collaborator to {repo}...[/cyan]")
-    
+    console.print(f"[cyan]Adding {username} as collaborator to {owner}/{repo_name}...[/cyan]")
+
     try:
         response = session.put(
-            f"https://api.github.com/repos/{user['login']}/{repo}/collaborators/{username}",
-            json={"permission": permission}
+            f"{GITHUB_API_URL}/repos/{owner}/{repo_name}/collaborators/{username}",
+            json={"permission": permission},
+            timeout=10
         )
         response.raise_for_status()
         console.print(f"[green]✓ Collaborator added: {username} ({permission})[/green]")
+    except (requests.ConnectionError, requests.Timeout) as e:
+        _handle_api_error("Add collaborator", e)
+    except requests.exceptions.HTTPError as e:
+        status = getattr(e.response, 'status_code', 'unknown')
+        if status == 404:
+            console.print(f"[red]✗ Repository '{owner}/{repo_name}' not found (404). Check --repo.[/red]")
+        else:
+            _handle_api_error("Add collaborator", e)
     except Exception as e:
         console.print(f"[red]✗ Failed to add collaborator: {e}[/red]")
 
@@ -294,24 +381,15 @@ def protect_branch(
 ) -> None:
     """Setup branch protection rules."""
     session = get_authenticated_session()
-    user = get_current_user()
-    
-    if not repo:
 
-        import git
-        try:
-            repo_obj = git.Repo(".")
+    try:
+        owner, repo_name = resolve_repo_ref(repo)
+    except RuntimeError as e:
+        console.print(f"[red]✗ {e}[/red]")
+        return
 
-            remotes = getattr(repo_obj, 'remotes')
-            origin = getattr(remotes, 'origin')
-            remote_url = origin.url
-            repo = remote_url.split("/")[-1].replace(".git", "")
-        except:
-            console.print("[red]✗ Could not detect repository. Use --repo option.[/red]")
-            return
-    
-    console.print(f"[cyan]Setting up protection for branch '{branch}'...[/cyan]")
-    
+    console.print(f"[cyan]Setting up protection for branch '{branch}' on {owner}/{repo_name}...[/cyan]")
+
     protection_data = {
         "required_status_checks": None,
         "enforce_admins": False,
@@ -323,18 +401,23 @@ def protect_branch(
         },
         "restrictions": None
     }
-    
+
     try:
         response = session.put(
-            f"{GITHUB_API_URL}/repos/{user['login']}/{repo}/branches/{branch}/protection",
+            f"{GITHUB_API_URL}/repos/{owner}/{repo_name}/branches/{branch}/protection",
             json=protection_data,
-            headers={"Accept": "application/vnd.github.luke-cage-preview+json"},
             timeout=10
         )
         response.raise_for_status()
         console.print(f"[green]✓ Branch protection enabled for '{branch}'[/green]")
     except (requests.ConnectionError, requests.Timeout) as e:
         _handle_api_error("Protect branch", e)
+    except requests.exceptions.HTTPError as e:
+        status = getattr(e.response, 'status_code', 'unknown')
+        if status == 404:
+            console.print(f"[red]✗ Repository '{owner}/{repo_name}' or branch '{branch}' not found (404).[/red]")
+        else:
+            _handle_api_error("Protect branch", e)
     except Exception as e:
         console.print(f"[red]✗ Failed to protect branch: {e}[/red]")
 

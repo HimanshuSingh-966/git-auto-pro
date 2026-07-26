@@ -1,6 +1,7 @@
 """Repository backup and restore module."""
 
 import shutil
+import sys
 import tarfile
 from pathlib import Path
 from datetime import datetime
@@ -36,15 +37,15 @@ def create_backup(output: Optional[str] = None) -> None:
                 for item in Path.cwd().iterdir():
                     if item.name != ".git":
                         tar.add(item, arcname=item.name)
-                
 
+                # Archive the entire .git directory so commit history
+                # (objects/ + packed refs) is preserved. Archiving only
+                # config/HEAD/refs leaves refs pointing at objects that
+                # aren't in the backup, making a restore useless.
                 git_dir = Path(".git")
                 if git_dir.exists():
-                    for item in ["config", "HEAD", "refs", "hooks"]:
-                        git_item = git_dir / item
-                        if git_item.exists():
-                            tar.add(git_item, arcname=f".git/{item}")
-            
+                    tar.add(git_dir, arcname=".git")
+
             progress.update(task, description="Backup complete!")
         
         backup_size = Path(output).stat().st_size / (1024 * 1024)  # MB
@@ -75,10 +76,14 @@ def restore_backup(backup_path: str) -> None:
         ) as progress:
             task = progress.add_task("Extracting backup...", total=None)
             
-            # Extract tar archive
+            # Extract tar archive. Use the data filter on Python 3.12+ to
+            # guard against path-traversal / unexpected link types in archives.
             with tarfile.open(backup_path, "r:gz") as tar:
-                tar.extractall(restore_dir)
-            
+                extract_kwargs = {}
+                if sys.version_info >= (3, 12):
+                    extract_kwargs["filter"] = "data"
+                tar.extractall(restore_dir, **extract_kwargs)
+
             progress.update(task, description="Restore complete!")
         
         console.print(f"[green]✓ Backup restored to: {restore_dir}[/green]")

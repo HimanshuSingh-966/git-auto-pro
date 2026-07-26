@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0] - 2026-07-26
+
+### 🔴 Critical Fixes
+- **Repository owner now detected from the remote URL** — `issue`, `pr`, `prs`, `merge-pr`, `review-pr`, `collab`, and `protect` previously assumed the repository belonged to the authenticated user (`repos/<you>/<repo>`), so they 404'd on organization, fork, or collaborator repos. The owner is now parsed from the `origin` remote (HTTPS, scp-style SSH `git@github.com:owner/repo`, `ssh://`, and `git://` forms). `--repo owner/name` is supported on all of these commands; a bare `--repo name` keeps the legacy behavior (paired with your login).
+- **`git-auto new` respects `default_branch`** — project creation no longer hardcodes `main`; it reads the configured default branch and aligns the local branch (`git branch -M`) before pushing, so it no longer fails when git's initial branch is `master`.
+- **Backups now preserve history** — `backup` archives the entire `.git` directory (including `objects/`). Previously only `.git/{config,HEAD,refs,hooks}` were archived, leaving refs pointing at missing objects, so a restored repo had no history. `restore` now uses the `filter="data"` extraction guard on Python 3.12+.
+- **Generated git hooks are POSIX-`sh` safe** — `pre-commit`/`pre-push` hooks used the bash-only `&>` redirect, which `/bin/sh` (dash on Ubuntu/Debian) parses as `&` (background) + `> /dev/null`. This made the `command -v <tool>` guard always pass, so the hook ran the (missing) tool and failed, blocking commits on systems without ruff/black/pytest installed. Replaced with the POSIX `> /dev/null 2>&1` form.
+- **PR reviewers/labels report the real outcome** — `pr` no longer prints `✓ Reviewers requested` / `✓ Labels added` when the API rejected the request (e.g. 422). The sub-requests now call `raise_for_status()` and report the actual HTTP status on failure.
+- **`close_issue` / `update_issue` network handling** — both now catch `ConnectionError`/`Timeout` (previously only `HTTPError` was caught, so a transient network error crashed with a raw traceback). All requests have `timeout=10`. The closing comment is now best-effort — a network error on the comment no longer aborts the actual close.
+- **Accurate `merge-pr` diagnostics** — 405 now reports "not mergeable (pending/failed checks, missing reviews, draft, or branch protection)" and 409 reports "merge conflicts or head branch changed". The previous messages were swapped.
+
+### 🛠️ Changed
+- **Modernized GitHub auth** — switched from the legacy `Authorization: token <PAT>` scheme and `application/vnd.github.v3+json` media type to `Authorization: Bearer <PAT>`, `application/vnd.github+json`, and the `X-GitHub-Api-Version: 2022-11-28` header. Removed the deprecated `mercy-preview` (topics) and `luke-cage-preview` (branch protection) preview media types.
+- **Removed dead code** — deleted an accidental ~190-line duplicate of the `github_templates` module that had been pasted into `scaffolding/hooks.py` (it was never imported; `cli.py` uses the real `github_templates.py`). `hooks.py` shrank from 331 to 138 lines.
+- **Reduced redundant API calls** — GitHub operations no longer make a separate `GET /user` round-trip solely to build repo URLs when the owner is detected from the remote.
+
+### 🧪 Testing
+- 89 tests total (up from 70)
+- 3 new test files: `test_github_remote.py` (remote URL parsing + owner resolution), `test_hooks.py` (POSIX-`sh` portability incl. live `dash` execution), `test_backup.py` (backup/restore round-trip proving history survives)
+- Zero regressions on the existing suite
+
+---
+
 ## [2.0.0] - 2026-03-10
 
 ### 🔴 Critical Fixes
