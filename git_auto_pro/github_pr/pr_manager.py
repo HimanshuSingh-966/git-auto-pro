@@ -3,32 +3,12 @@
 import requests
 import webbrowser
 from typing import Optional, List, Dict, Any
+from urllib.parse import quote
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 
 console = Console()
-
-
-def _get_repo_info() -> tuple:
-    """Get current user and repo name from Git remote."""
-    from ..github import get_authenticated_session, get_current_user, GITHUB_API_URL, _handle_api_error
-    import git
-    
-    session = get_authenticated_session()
-    user = get_current_user()
-    
-    try:
-        repo_obj = git.Repo(".", search_parent_directories=True)
-        remotes = getattr(repo_obj, 'remotes')
-        origin = getattr(remotes, 'origin')
-        remote_url = origin.url
-        repo_name = remote_url.split("/")[-1].replace(".git", "")
-    except Exception:
-        console.print("[red]✗ Could not detect repository. Use --repo option.[/red]")
-        raise
-    
-    return session, user, repo_name, GITHUB_API_URL
 
 
 def create_pull_request(
@@ -42,14 +22,21 @@ def create_pull_request(
     repo: Optional[str] = None,
 ) -> Dict:
     """Create a GitHub Pull Request."""
-    from ..github import get_authenticated_session, get_current_user, GITHUB_API_URL, _handle_api_error
-    
+    from ..github import (
+        get_authenticated_session,
+        resolve_repo_ref,
+        _api_url,
+        _handle_api_error,
+    )
+
     session = get_authenticated_session()
-    user = get_current_user()
-    
-    if not repo:
-        _, _, repo, _ = _get_repo_info()
-    
+
+    try:
+        owner, repo_name = resolve_repo_ref(repo)
+    except RuntimeError as e:
+        console.print(f"[red]✗ {e}[/red]")
+        raise
+
     data: Dict[str, Any] = {
         "title": title,
         "head": head,
@@ -58,44 +45,60 @@ def create_pull_request(
     }
     if body:
         data["body"] = body
-    
+
     try:
         response = session.post(
-            f"{GITHUB_API_URL}/repos/{user['login']}/{repo}/pulls",
+            _api_url("repos", owner, repo_name, "pulls"),
             json=data,
             timeout=10
         )
         response.raise_for_status()
         pr_data = response.json()
-        
+
         console.print(f"[green]✓ PR #{pr_data['number']} created: {pr_data['html_url']}[/green]")
-        
-        # Add reviewers if specified
+
+        pr_number = pr_data["number"]
+
+        # Add reviewers if specified — report the real outcome, don't claim
+        # success when the API rejected the request.
         if reviewers:
             try:
-                session.post(
-                    f"{GITHUB_API_URL}/repos/{user['login']}/{repo}/pulls/{pr_data['number']}/requested_reviewers",
+                rv = session.post(
+                    _api_url(
+                        "repos", owner, repo_name, "pulls", pr_number,
+                        "requested_reviewers",
+                    ),
                     json={"reviewers": reviewers},
                     timeout=10
                 )
+                rv.raise_for_status()
                 console.print(f"[green]✓ Reviewers requested: {', '.join(reviewers)}[/green]")
-            except Exception:
-                console.print("[yellow]⚠ Could not add reviewers[/yellow]")
-        
-        # Add labels if specified
+            except requests.exceptions.HTTPError as e:
+                status = getattr(e.response, 'status_code', 'unknown')
+                console.print(f"[yellow]⚠ Could not add reviewers (HTTP {status})[/yellow]")
+            except (requests.ConnectionError, requests.Timeout):
+                console.print("[yellow]⚠ Could not add reviewers — network error[/yellow]")
+
+        # Add labels if specified — same accurate reporting.
         if labels:
             try:
-                session.post(
-                    f"{GITHUB_API_URL}/repos/{user['login']}/{repo}/issues/{pr_data['number']}/labels",
+                lb = session.post(
+                    _api_url(
+                        "repos", owner, repo_name, "issues", pr_number, "labels",
+                    ),
                     json={"labels": labels},
                     timeout=10
                 )
+                lb.raise_for_status()
                 console.print(f"[green]✓ Labels added: {', '.join(labels)}[/green]")
-            except Exception:
-                console.print("[yellow]⚠ Could not add labels[/yellow]")
-        
+            except requests.exceptions.HTTPError as e:
+                status = getattr(e.response, 'status_code', 'unknown')
+                console.print(f"[yellow]⚠ Could not add labels (HTTP {status})[/yellow]")
+            except (requests.ConnectionError, requests.Timeout):
+                console.print("[yellow]⚠ Could not add labels — network error[/yellow]")
+
         return pr_data
-        
+
     except (requests.ConnectionError, requests.Timeout) as e:
         _handle_api_error("Create PR", e)
         raise
@@ -107,35 +110,49 @@ def create_pull_request(
         raise
 
 
-def list_pull_requests(state: str = "open", repo: Optional[str] = None) -> List[Dict]:
+def list_pull_requests(
+    state: str = "open",
+    repo: Optional[str] = None,
+    limit: int = 30,
+) -> List[Dict]:
     """List pull requests for the repository."""
-    from ..github import get_authenticated_session, get_current_user, GITHUB_API_URL, _handle_api_error
-    
+    from ..github import (
+        get_authenticated_session,
+        resolve_repo_ref,
+        _api_url,
+        _paginated_get,
+        _handle_api_error,
+    )
+
     session = get_authenticated_session()
-    user = get_current_user()
-    
-    if not repo:
-        _, _, repo, _ = _get_repo_info()
-    
+
     try:
-        response = session.get(
-            f"{GITHUB_API_URL}/repos/{user['login']}/{repo}/pulls",
-            params={"state": state, "per_page": 30},
-            timeout=10
+        owner, repo_name = resolve_repo_ref(repo)
+    except RuntimeError as e:
+        console.print(f"[red]✗ {e}[/red]")
+        return []
+
+    try:
+        # Paginate via the Link rel="next" header so repos with many PRs
+        # aren't silently truncated at GitHub's 100-per-page ceiling.
+        prs = _paginated_get(
+            session,
+            _api_url("repos", owner, repo_name, "pulls"),
+            {"state": state},
+            limit,
+            "List PRs",
         )
-        response.raise_for_status()
-        prs = response.json()
-        
+
         if not prs:
             console.print(f"[yellow]No {state} pull requests found[/yellow]")
             return []
-        
+
         table = Table(title=f"{state.capitalize()} Pull Requests", show_header=True)
         table.add_column("#", style="yellow", width=6)
         table.add_column("Title", style="cyan")
         table.add_column("Branch", style="green", width=25)
         table.add_column("Author", style="magenta", width=15)
-        
+
         for pr in prs:
             table.add_row(
                 str(pr["number"]),
@@ -143,10 +160,10 @@ def list_pull_requests(state: str = "open", repo: Optional[str] = None) -> List[
                 pr["head"]["ref"],
                 pr["user"]["login"]
             )
-        
+
         console.print(table)
         return prs
-        
+
     except (requests.ConnectionError, requests.Timeout) as e:
         _handle_api_error("List PRs", e)
         return []
@@ -161,38 +178,51 @@ def merge_pull_request(
     repo: Optional[str] = None
 ) -> bool:
     """Merge a pull request by number."""
-    from ..github import get_authenticated_session, get_current_user, GITHUB_API_URL, _handle_api_error
-    
+    from ..github import (
+        get_authenticated_session,
+        resolve_repo_ref,
+        _api_url,
+        _handle_api_error,
+    )
+
     session = get_authenticated_session()
-    user = get_current_user()
-    
-    if not repo:
-        _, _, repo, _ = _get_repo_info()
-    
+
+    try:
+        owner, repo_name = resolve_repo_ref(repo)
+    except RuntimeError as e:
+        console.print(f"[red]✗ {e}[/red]")
+        return False
+
     valid_methods = ("merge", "squash", "rebase")
     if method not in valid_methods:
         console.print(f"[red]✗ Invalid merge method. Use: {', '.join(valid_methods)}[/red]")
         return False
-    
+
     try:
         response = session.put(
-            f"{GITHUB_API_URL}/repos/{user['login']}/{repo}/pulls/{number}/merge",
+            _api_url("repos", owner, repo_name, "pulls", number, "merge"),
             json={"merge_method": method},
             timeout=10
         )
         response.raise_for_status()
-        
+
         console.print(f"[green]✓ PR #{number} merged ({method})[/green]")
         return True
-        
+
     except (requests.ConnectionError, requests.Timeout) as e:
         _handle_api_error("Merge PR", e)
         return False
     except requests.exceptions.HTTPError as e:
-        if e.response.status_code == 405:
-            console.print(f"[red]✗ PR #{number} cannot be merged — check for conflicts[/red]")
-        elif e.response.status_code == 409:
-            console.print(f"[red]✗ PR #{number} head branch was modified — review required[/red]")
+        status = getattr(e.response, 'status_code', 'unknown')
+        if status == 405:
+            # 405 = merge not permitted: failing/pending required checks,
+            # missing reviews, draft, or branch protection rules.
+            console.print(f"[red]✗ PR #{number} is not mergeable[/red]")
+            console.print("[yellow]→ Pending/failed required checks, missing reviews, draft, or branch protection may block the merge.[/yellow]")
+        elif status == 409:
+            # 409 = head/base conflict or the head branch changed mid-merge.
+            console.print(f"[red]✗ PR #{number} has merge conflicts or the head branch changed[/red]")
+            console.print("[yellow]→ Resolve conflicts or re-review, then try again.[/yellow]")
         else:
             _handle_api_error("Merge PR", e)
         return False
@@ -200,22 +230,29 @@ def merge_pull_request(
 
 def get_pull_request(number: int, repo: Optional[str] = None) -> Optional[Dict]:
     """Get details of a specific pull request."""
-    from ..github import get_authenticated_session, get_current_user, GITHUB_API_URL, _handle_api_error
-    
+    from ..github import (
+        get_authenticated_session,
+        resolve_repo_ref,
+        _api_url,
+        _handle_api_error,
+    )
+
     session = get_authenticated_session()
-    user = get_current_user()
-    
-    if not repo:
-        _, _, repo, _ = _get_repo_info()
-    
+
+    try:
+        owner, repo_name = resolve_repo_ref(repo)
+    except RuntimeError as e:
+        console.print(f"[red]✗ {e}[/red]")
+        return None
+
     try:
         response = session.get(
-            f"{GITHUB_API_URL}/repos/{user['login']}/{repo}/pulls/{number}",
+            _api_url("repos", owner, repo_name, "pulls", number),
             timeout=10
         )
         response.raise_for_status()
         pr = response.json()
-        
+
         info = f"""[bold cyan]PR #{pr['number']}[/bold cyan]
 [bold]Title:[/bold] {pr['title']}
 [bold]State:[/bold] {pr['state']}
@@ -227,10 +264,10 @@ def get_pull_request(number: int, repo: Optional[str] = None) -> Optional[Dict]:
 [bold]Description:[/bold]
 {pr.get('body', 'No description provided') or 'No description provided'}
 """
-        
+
         console.print(Panel(info, border_style="cyan"))
         return pr
-        
+
     except (requests.ConnectionError, requests.Timeout) as e:
         _handle_api_error("Get PR", e)
         return None
@@ -241,14 +278,19 @@ def get_pull_request(number: int, repo: Optional[str] = None) -> Optional[Dict]:
 
 def review_pr_in_browser(number: int, repo: Optional[str] = None) -> None:
     """Open a PR in the browser for review."""
-    from ..github import get_authenticated_session, get_current_user, GITHUB_API_URL
-    
+    from ..github import get_authenticated_session, resolve_repo_ref
+
     session = get_authenticated_session()
-    user = get_current_user()
-    
-    if not repo:
-        _, _, repo, _ = _get_repo_info()
-    
-    url = f"https://github.com/{user['login']}/{repo}/pull/{number}"
+
+    try:
+        owner, repo_name = resolve_repo_ref(repo)
+    except RuntimeError as e:
+        console.print(f"[red]✗ {e}[/red]")
+        return
+
+    url = (
+        f"https://github.com/{quote(owner, safe='')}"
+        f"/{quote(repo_name, safe='')}/pull/{number}"
+    )
     console.print(f"[cyan]Opening PR #{number} in browser...[/cyan]")
     webbrowser.open(url)
