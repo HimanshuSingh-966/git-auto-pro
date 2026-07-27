@@ -8,6 +8,17 @@ Git-Auto Pro is a powerful command-line tool that automates your entire developm
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![PyPI](https://img.shields.io/badge/pypi-git--auto--pro-orange.svg)](https://pypi.org/project/git-auto-pro/)
 
+## 🆕 What's New in 2.6.0
+
+- **Pagination** — `issue list` and `prs` now follow GitHub's `Link` header, so `--limit 500` and large repos no longer silently cap at 100.
+- **Rate-limit handling** — 429 / rate-limited-403 responses report the reset time and `Retry-After`; you get a heads-up when your API budget runs low.
+- **Safe URLs** — repo/owner/branch names with special characters (`#`, `?`, spaces) are now URL-encoded, fixing broken requests and closing a path-injection gap.
+- **Faster** — the authenticated session and current user are cached per invocation, cutting the redundant `GET /user` call every GitHub command used to make.
+- **Consistent failures** — `issue create` no longer raises on API errors; it returns empty like the other issue commands.
+- **Safer token storage** — warns if the fallback token file can't be locked to `0o600`, and `logout` is honest when the keyring entry can't be removed.
+
+See the [CHANGELOG](CHANGELOG.md) for the full list.
+
 ## 🆕 What's New in 2.5.0
 
 - **Org/fork repo support** — GitHub commands (`issue`, `pr`, `prs`, `merge-pr`, `review-pr`, `collab`, `protect`) now detect the repository **owner** from your `origin` remote instead of assuming it's your own. They work on organization, fork, and collaborator repos. Pass `--repo owner/name` to target any repo explicitly.

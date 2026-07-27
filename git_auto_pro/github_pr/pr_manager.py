@@ -3,6 +3,7 @@
 import requests
 import webbrowser
 from typing import Optional, List, Dict, Any
+from urllib.parse import quote
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
@@ -24,7 +25,7 @@ def create_pull_request(
     from ..github import (
         get_authenticated_session,
         resolve_repo_ref,
-        GITHUB_API_URL,
+        _api_url,
         _handle_api_error,
     )
 
@@ -47,7 +48,7 @@ def create_pull_request(
 
     try:
         response = session.post(
-            f"{GITHUB_API_URL}/repos/{owner}/{repo_name}/pulls",
+            _api_url("repos", owner, repo_name, "pulls"),
             json=data,
             timeout=10
         )
@@ -56,12 +57,17 @@ def create_pull_request(
 
         console.print(f"[green]✓ PR #{pr_data['number']} created: {pr_data['html_url']}[/green]")
 
+        pr_number = pr_data["number"]
+
         # Add reviewers if specified — report the real outcome, don't claim
         # success when the API rejected the request.
         if reviewers:
             try:
                 rv = session.post(
-                    f"{GITHUB_API_URL}/repos/{owner}/{repo_name}/pulls/{pr_data['number']}/requested_reviewers",
+                    _api_url(
+                        "repos", owner, repo_name, "pulls", pr_number,
+                        "requested_reviewers",
+                    ),
                     json={"reviewers": reviewers},
                     timeout=10
                 )
@@ -77,7 +83,9 @@ def create_pull_request(
         if labels:
             try:
                 lb = session.post(
-                    f"{GITHUB_API_URL}/repos/{owner}/{repo_name}/issues/{pr_data['number']}/labels",
+                    _api_url(
+                        "repos", owner, repo_name, "issues", pr_number, "labels",
+                    ),
                     json={"labels": labels},
                     timeout=10
                 )
@@ -102,12 +110,17 @@ def create_pull_request(
         raise
 
 
-def list_pull_requests(state: str = "open", repo: Optional[str] = None) -> List[Dict]:
+def list_pull_requests(
+    state: str = "open",
+    repo: Optional[str] = None,
+    limit: int = 30,
+) -> List[Dict]:
     """List pull requests for the repository."""
     from ..github import (
         get_authenticated_session,
         resolve_repo_ref,
-        GITHUB_API_URL,
+        _api_url,
+        _paginated_get,
         _handle_api_error,
     )
 
@@ -120,13 +133,15 @@ def list_pull_requests(state: str = "open", repo: Optional[str] = None) -> List[
         return []
 
     try:
-        response = session.get(
-            f"{GITHUB_API_URL}/repos/{owner}/{repo_name}/pulls",
-            params={"state": state, "per_page": 30},
-            timeout=10
+        # Paginate via the Link rel="next" header so repos with many PRs
+        # aren't silently truncated at GitHub's 100-per-page ceiling.
+        prs = _paginated_get(
+            session,
+            _api_url("repos", owner, repo_name, "pulls"),
+            {"state": state},
+            limit,
+            "List PRs",
         )
-        response.raise_for_status()
-        prs = response.json()
 
         if not prs:
             console.print(f"[yellow]No {state} pull requests found[/yellow]")
@@ -166,7 +181,7 @@ def merge_pull_request(
     from ..github import (
         get_authenticated_session,
         resolve_repo_ref,
-        GITHUB_API_URL,
+        _api_url,
         _handle_api_error,
     )
 
@@ -185,7 +200,7 @@ def merge_pull_request(
 
     try:
         response = session.put(
-            f"{GITHUB_API_URL}/repos/{owner}/{repo_name}/pulls/{number}/merge",
+            _api_url("repos", owner, repo_name, "pulls", number, "merge"),
             json={"merge_method": method},
             timeout=10
         )
@@ -218,7 +233,7 @@ def get_pull_request(number: int, repo: Optional[str] = None) -> Optional[Dict]:
     from ..github import (
         get_authenticated_session,
         resolve_repo_ref,
-        GITHUB_API_URL,
+        _api_url,
         _handle_api_error,
     )
 
@@ -232,7 +247,7 @@ def get_pull_request(number: int, repo: Optional[str] = None) -> Optional[Dict]:
 
     try:
         response = session.get(
-            f"{GITHUB_API_URL}/repos/{owner}/{repo_name}/pulls/{number}",
+            _api_url("repos", owner, repo_name, "pulls", number),
             timeout=10
         )
         response.raise_for_status()
@@ -273,6 +288,9 @@ def review_pr_in_browser(number: int, repo: Optional[str] = None) -> None:
         console.print(f"[red]✗ {e}[/red]")
         return
 
-    url = f"https://github.com/{owner}/{repo_name}/pull/{number}"
+    url = (
+        f"https://github.com/{quote(owner, safe='')}"
+        f"/{quote(repo_name, safe='')}/pull/{number}"
+    )
     console.print(f"[cyan]Opening PR #{number} in browser...[/cyan]")
     webbrowser.open(url)

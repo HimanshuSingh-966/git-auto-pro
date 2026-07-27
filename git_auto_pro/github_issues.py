@@ -18,7 +18,7 @@ def create_issue(
     repo: Optional[str] = None
 ) -> Dict:
     """Create a new GitHub issue."""
-    from .github import get_authenticated_session, resolve_repo_ref
+    from .github import get_authenticated_session, resolve_repo_ref, _api_url
 
     console.print("[bold cyan]📝 Creating GitHub Issue[/bold cyan]\n")
 
@@ -41,7 +41,7 @@ def create_issue(
 
     try:
         response = session.post(
-            f"https://api.github.com/repos/{owner}/{repo_name}/issues",
+            _api_url("repos", owner, repo_name, "issues"),
             json=data,
             timeout=10
         )
@@ -57,8 +57,10 @@ def create_issue(
         console.print("[red]✗ Cannot reach GitHub API — check your internet connection.[/red]")
         return {}
     except requests.exceptions.HTTPError as e:
+        # Consistent contract with the other issue operations: return an empty
+        # result on failure rather than raising to the CLI layer.
         console.print(f"[red]✗ Failed to create issue: {e}[/red]")
-        raise
+        return {}
 
 
 def list_issues(
@@ -69,7 +71,12 @@ def list_issues(
     limit: int = 30
 ) -> List[Dict]:
     """List GitHub issues."""
-    from .github import get_authenticated_session, resolve_repo_ref
+    from .github import (
+        get_authenticated_session,
+        resolve_repo_ref,
+        _api_url,
+        _paginated_get,
+    )
 
     console.print(f"[bold cyan]📋 Listing {state.capitalize()} Issues[/bold cyan]\n")
 
@@ -81,24 +88,22 @@ def list_issues(
         console.print(f"[red]✗ {e}[/red]")
         return []
 
-    params = {
-        "state": state,
-        "per_page": limit
-    }
-
+    params: Dict[str, Any] = {"state": state}
     if labels:
         params["labels"] = labels
     if assignee:
         params["assignee"] = assignee
 
     try:
-        response = session.get(
-            f"https://api.github.com/repos/{owner}/{repo_name}/issues",
-            params=params,
-            timeout=10
+        # Paginate via the Link rel="next" header so large repos aren't
+        # silently truncated at GitHub's 100-per-page ceiling.
+        issues = _paginated_get(
+            session,
+            _api_url("repos", owner, repo_name, "issues"),
+            params,
+            limit,
+            "List issues",
         )
-        response.raise_for_status()
-        issues = response.json()
 
         if not issues:
             console.print(f"[yellow]No {state} issues found[/yellow]")
@@ -134,7 +139,7 @@ def list_issues(
 
 def get_issue(number: int, repo: Optional[str] = None) -> Optional[Dict]:
     """Get details of a specific issue."""
-    from .github import get_authenticated_session, resolve_repo_ref
+    from .github import get_authenticated_session, resolve_repo_ref, _api_url
 
     session = get_authenticated_session()
 
@@ -146,15 +151,15 @@ def get_issue(number: int, repo: Optional[str] = None) -> Optional[Dict]:
 
     try:
         response = session.get(
-            f"https://api.github.com/repos/{owner}/{repo_name}/issues/{number}",
+            _api_url("repos", owner, repo_name, "issues", number),
             timeout=10
         )
         response.raise_for_status()
         issue = response.json()
-        
+
         labels_str = ", ".join([label["name"] for label in issue.get("labels", [])])
         assignees_str = ", ".join([assignee["login"] for assignee in issue.get("assignees", [])])
-        
+
         info = f"""[bold cyan]Issue #{issue['number']}[/bold cyan]
 [bold]Title:[/bold] {issue['title']}
 [bold]State:[/bold] {issue['state']}
@@ -167,11 +172,11 @@ def get_issue(number: int, repo: Optional[str] = None) -> Optional[Dict]:
 [bold]Description:[/bold]
 {issue.get('body', 'No description provided')}
 """
-        
+
         console.print(Panel(info, border_style="cyan"))
-        
+
         return issue
-        
+
     except (requests.ConnectionError, requests.Timeout):
         console.print("[red]✗ Cannot reach GitHub API — check your internet connection.[/red]")
         return None
@@ -186,7 +191,7 @@ def close_issue(
     repo: Optional[str] = None
 ) -> bool:
     """Close a GitHub issue."""
-    from .github import get_authenticated_session, resolve_repo_ref
+    from .github import get_authenticated_session, resolve_repo_ref, _api_url
 
     console.print(f"[bold cyan]🔒 Closing Issue #{number}[/bold cyan]\n")
 
@@ -204,7 +209,7 @@ def close_issue(
         if comment:
             try:
                 session.post(
-                    f"https://api.github.com/repos/{owner}/{repo_name}/issues/{number}/comments",
+                    _api_url("repos", owner, repo_name, "issues", number, "comments"),
                     json={"body": comment},
                     timeout=10
                 )
@@ -212,7 +217,7 @@ def close_issue(
                 console.print("[yellow]⚠ Could not post closing comment — network error[/yellow]")
 
         response = session.patch(
-            f"https://api.github.com/repos/{owner}/{repo_name}/issues/{number}",
+            _api_url("repos", owner, repo_name, "issues", number),
             json={"state": "closed"},
             timeout=10
         )
@@ -238,7 +243,7 @@ def update_issue(
     repo: Optional[str] = None
 ) -> Optional[Dict]:
     """Update a GitHub issue."""
-    from .github import get_authenticated_session, resolve_repo_ref
+    from .github import get_authenticated_session, resolve_repo_ref, _api_url
 
     console.print(f"[bold cyan]✏️  Updating Issue #{number}[/bold cyan]\n")
 
@@ -266,7 +271,7 @@ def update_issue(
 
     try:
         response = session.patch(
-            f"https://api.github.com/repos/{owner}/{repo_name}/issues/{number}",
+            _api_url("repos", owner, repo_name, "issues", number),
             json=data,
             timeout=10
         )

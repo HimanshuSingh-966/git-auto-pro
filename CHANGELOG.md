@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.0] - 2026-07-26
+
+### 🛡️ Robustness & API Hardening
+- **Pagination** — `issue list` and `prs` now follow the GitHub `Link: rel="next"` header instead of issuing a single request capped at GitHub's 100-per-page ceiling. `--limit` values above 100 (or large repos) are no longer silently truncated.
+- **Rate-limit awareness** — 429 responses and 403-with-`X-RateLimit-Remaining: 0` are detected and reported with the reset time / `Retry-After`. Successful responses also print a proactive warning when the remaining budget is low (≤ 5).
+- **URL-encoding** — all GitHub path parameters (owner, repo, username, branch) are now percent-encoded via a shared `_api_url()` helper. Branch/repo names containing `#`, `?`, spaces, or `/` no longer break the request or risk path-injection.
+- **Cached session + current user** — the authenticated `requests.Session` and `GET /user` result are cached per process and invalidated on login/logout/token changes, eliminating the redundant `GET /user` round-trip every GitHub operation used to make.
+- **Consistent error contract** — `issue create` now returns `{}` on HTTP failure instead of re-raising, matching `list`/`get`/`close`/`update`. (`create_pull_request` still raises, since the safe-push flow depends on either a number-bearing dict or an exception.)
+
+### 🔐 Token Storage
+- **`chmod` warning** — if setting `0o600` on the fallback token file fails, a warning is now printed (previously silently swallowed), since the plaintext token could be readable by other users.
+- **Honest `logout`** — `clear_stored_token` now warns if the keyring entry could not be removed (it may still be stored) rather than reporting success; it also reports when there was no token to clear.
+
+### 🧪 Testing
+- 110 tests total (up from 89)
+- New `test_github_robustness.py` covering `_api_url` encoding, `_next_link`, `_paginated_get` (follows `Link`, respects limit, empty/single page), `_is_rate_limited`, and auth-cache invalidation
+- Autouse fixture clears the auth cache between tests to prevent cross-test leakage
+
+---
+
 ## [2.5.0] - 2026-07-26
 
 ### 🔴 Critical Fixes
