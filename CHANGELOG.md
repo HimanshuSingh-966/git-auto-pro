@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.0] - 2026-07-27
+
+### ✨ New Features
+- **`--json` output** — `issue list`, `issue view`, `prs`, `stats`, and `doctor` now accept `--json` to emit machine-readable JSON (via `json.dumps(..., indent=2)`) instead of Rich tables/panels. Makes the tool scriptable from `jq`, makefiles, and CI.
+- **`--dry-run`** — destructive operations now support `--dry-run` to print the planned action without executing: `undo`, `push` (incl. `--force`), `merge-pr`, `release`, and the ignore-manager's `clean-ignored-files`.
+- **`git-auto sync`** — new command that pulls with rebase then pushes the current branch, the daily-workflow one-liner.
+- **Per-repo config** — a repo-local `.git-auto.json` at the repository root now overrides `~/.git-auto-config.json` (which still overrides the defaults). Precedence: defaults < user < repo.
+- **Shell completion** — enabled (`add_completion=True`); run `git-auto --install-completion` to install bash/zsh/fish completion.
+- **`GIT_AUTO_DEBUG` logging** — the debug mode documented in `troubleshooting.md` is now actually implemented. `export GIT_AUTO_DEBUG=1` enables debug logging to `~/.git-auto.log` (and stderr). See `git_auto_pro/logging_setup.py`.
+- **Stronger `doctor`** — now reports token scopes (warns if `repo`/`workflow` are missing), checks upstream tracking, and shows ahead/behind vs upstream. Modernized the token check to `Bearer` auth. `doctor` also supports `--json`.
+
+### 🐛 Fixes
+- **`release` owner detection** — `create_release` now resolves the repo owner from the `origin` remote (via `resolve_repo_ref` + `_api_url`) instead of assuming the authenticated user, so GitHub releases are created against the correct repo for org/fork projects.
+
+### 🧪 Testing
+- 118 tests total (up from 110)
+- New `test_tier3.py` covering per-repo config precedence, `stats --json`, `--dry-run` no-ops for `undo`/`release`/`git-sync`, and doctor token-scope parsing (ok + missing-workflow warn)
+
+---
+
 ## [2.6.0] - 2026-07-26
 
 ### 🛡️ Robustness & API Hardening

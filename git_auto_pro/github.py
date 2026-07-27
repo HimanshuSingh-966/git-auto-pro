@@ -12,6 +12,10 @@ from rich.console import Console
 from rich.prompt import Prompt, Confirm
 import questionary
 
+from .logging_setup import get_logger
+
+logger = get_logger(__name__)
+
 console = Console()
 
 SERVICE_NAME = "git-auto-pro"
@@ -163,6 +167,7 @@ def _paginated_get(
     next_url: Optional[str] = url
     use_params: Optional[Dict[str, Any]] = first_params
     while next_url:
+        logger.debug("GET %s params=%s", next_url, use_params)
         response = session.get(next_url, params=use_params, timeout=10)
         response.raise_for_status()
         _check_rate_limit(response, operation)

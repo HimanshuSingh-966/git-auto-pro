@@ -1,5 +1,6 @@
 """Main CLI interface using Typer."""
 
+import json
 import typer
 from typing import Optional, List
 from pathlib import Path
@@ -7,6 +8,11 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 import questionary
+
+# Configure logging (honors GIT_AUTO_DEBUG) before any submodule imports its
+# logger. See git_auto_pro/logging_setup.py.
+from .logging_setup import setup_logging
+setup_logging()
 
 # Import submodules
 from .github import (
@@ -39,6 +45,7 @@ from .git_commands import (
     git_clone,
     git_stats,
     git_undo,
+    git_sync,
 )
 from .config import (
     get_config,
@@ -61,7 +68,7 @@ console = Console()
 app = typer.Typer(
     name="git-auto",
     help="🚀 Complete Git + GitHub automation CLI tool",
-    add_completion=False,
+    add_completion=True,
 )
 
 # ============================================================================
@@ -175,16 +182,17 @@ def push(
     branch: Optional[str] = typer.Option(None, "--branch", "-b", help="Branch to push (default: from config)"),
     force: bool = typer.Option(False, "--force", "-f", help="Force push"),
     safe: bool = typer.Option(False, "--safe", help="Use safe commit flow (test branch + PR)"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would happen without doing it"),
 ):
     """⬆️ Push commits to remote."""
     config = load_config()
     use_safe = safe or config.get("safe_mode", False)
-    
+
     if use_safe and message:
         from .commands.safe_flow import safe_push
         safe_push(message)
     else:
-        git_push(message, branch, force)
+        git_push(message, branch, force, dry_run=dry_run)
 
 
 @app.command()
@@ -196,6 +204,14 @@ def pull(
 ):
     """⬇️ Pull changes from remote."""
     git_pull(branch, rebase, no_rebase, ff_only)
+
+
+@app.command()
+def sync(
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would happen without doing it"),
+):
+    """🔄 Sync current branch: pull --rebase then push."""
+    git_sync(dry_run=dry_run)
 
 
 @app.command()
@@ -305,9 +321,12 @@ def clone(
 @app.command()
 def stats(
     detailed: bool = typer.Option(False, "--detailed", "-d", help="Show detailed statistics"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON instead of a table"),
 ):
     """📈 Show repository statistics."""
-    git_stats(detailed)
+    data = git_stats(detailed, json_output=json_output)
+    if json_output and data is not None:
+        print(json.dumps(data, indent=2, default=str))
 
 
 # ============================================================================
@@ -446,20 +465,26 @@ def issue_list(
     assignee: Optional[str] = typer.Option(None, "--assignee", "-a", help="Filter by assignee"),
     repo: Optional[str] = typer.Option(None, "--repo", "-r", help="Repository name"),
     limit: int = typer.Option(30, "--limit", "-n", help="Number of issues to show"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON instead of a table"),
 ):
     """List GitHub issues."""
-    
-    list_issues(state, labels, assignee, repo, limit)
+
+    issues = list_issues(state, labels, assignee, repo, limit, json_output=json_output)
+    if json_output:
+        print(json.dumps(issues, indent=2, default=str))
 
 
 @issue_app.command("view")
 def issue_view(
     number: int = typer.Argument(..., help="Issue number"),
     repo: Optional[str] = typer.Option(None, "--repo", "-r", help="Repository name"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON instead of a panel"),
 ):
     """View details of a specific issue."""
-    
-    get_issue(number, repo)
+
+    issue = get_issue(number, repo, json_output=json_output)
+    if json_output:
+        print(json.dumps(issue, indent=2, default=str))
 
 
 @issue_app.command("close")
@@ -596,9 +621,10 @@ def undo(
     hard: bool = typer.Option(False, "--hard", help="Hard reset: discard all changes"),
     push_flag: bool = typer.Option(False, "--push", help="Soft undo + force push"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would happen without doing it"),
 ):
     """⏪ Undo last commit."""
-    git_undo(hard=hard, force_push=push_flag, confirm=yes)
+    git_undo(hard=hard, force_push=push_flag, confirm=yes, dry_run=dry_run)
 
 
 # ============================================================================
@@ -610,10 +636,11 @@ def release(
     version: str = typer.Argument(..., help="Version (1.2.0) or bump type (patch/minor/major)"),
     draft: bool = typer.Option(False, "--draft", help="Create draft release"),
     notes: Optional[str] = typer.Option(None, "--notes", "-n", help="Release notes"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show the planned release without doing anything"),
 ):
     """🚀 Create a release — tag, push, and GitHub release."""
     from .commands.release import create_release
-    create_release(version, draft, notes)
+    create_release(version, draft, notes, dry_run=dry_run)
 
 
 # ============================================================================
@@ -621,10 +648,14 @@ def release(
 # ============================================================================
 
 @app.command()
-def doctor():
+def doctor(
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON instead of a table"),
+):
     """🩺 Run system diagnostics."""
     from .commands.doctor import run_diagnostics
-    run_diagnostics()
+    results = run_diagnostics(json_output=json_output)
+    if json_output and results is not None:
+        print(json.dumps(results, indent=2, default=str))
 
 
 # ============================================================================
@@ -668,10 +699,14 @@ def pr(
 @app.command()
 def prs(
     state: str = typer.Option("open", "--state", "-s", help="PR state (open/closed/all)"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON instead of a table"),
+    limit: int = typer.Option(30, "--limit", "-n", help="Number of PRs to show"),
 ):
     """📋 List pull requests for current repo."""
     from .github_pr.pr_manager import list_pull_requests
-    list_pull_requests(state)
+    prs_data = list_pull_requests(state, limit=limit, json_output=json_output)
+    if json_output:
+        print(json.dumps(prs_data, indent=2, default=str))
 
 
 @app.command(name="merge-pr")
@@ -679,18 +714,19 @@ def merge_pr(
     number: int = typer.Argument(..., help="PR number to merge"),
     squash: bool = typer.Option(False, "--squash", help="Squash merge"),
     rebase: bool = typer.Option(False, "--rebase", help="Rebase merge"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would happen without doing it"),
 ):
     """🔗 Merge a pull request by number."""
     from .github_pr.pr_manager import merge_pull_request
-    
+
     if squash:
         method = "squash"
     elif rebase:
         method = "rebase"
     else:
         method = "merge"
-    
-    merge_pull_request(number, method)
+
+    merge_pull_request(number, method, dry_run=dry_run)
 
 
 @app.command(name="review-pr")

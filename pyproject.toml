@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "git-auto-pro"
-version = "2.6.0"
+version = "2.7.0"
 description = "Complete Git + GitHub automation CLI tool with interactive file management"
 authors = [{name = "Himanshu Singh", email = "choudharyhimanshusingh966@gmail.com"}]
 maintainers = [{name = "Himanshu Singh", email = "choudharyhimanshusingh966@gmail.com"}]

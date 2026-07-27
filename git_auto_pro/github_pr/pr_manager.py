@@ -114,6 +114,7 @@ def list_pull_requests(
     state: str = "open",
     repo: Optional[str] = None,
     limit: int = 30,
+    json_output: bool = False,
 ) -> List[Dict]:
     """List pull requests for the repository."""
     from ..github import (
@@ -123,6 +124,9 @@ def list_pull_requests(
         _paginated_get,
         _handle_api_error,
     )
+
+    if not json_output:
+        console.print(f"[bold cyan]📋 Listing {state.capitalize()} Pull Requests[/bold cyan]\n")
 
     session = get_authenticated_session()
 
@@ -143,25 +147,27 @@ def list_pull_requests(
             "List PRs",
         )
 
-        if not prs:
-            console.print(f"[yellow]No {state} pull requests found[/yellow]")
-            return []
+        if not json_output:
+            if not prs:
+                console.print(f"[yellow]No {state} pull requests found[/yellow]")
+                return []
 
-        table = Table(title=f"{state.capitalize()} Pull Requests", show_header=True)
-        table.add_column("#", style="yellow", width=6)
-        table.add_column("Title", style="cyan")
-        table.add_column("Branch", style="green", width=25)
-        table.add_column("Author", style="magenta", width=15)
+            table = Table(title=f"{state.capitalize()} Pull Requests", show_header=True)
+            table.add_column("#", style="yellow", width=6)
+            table.add_column("Title", style="cyan")
+            table.add_column("Branch", style="green", width=25)
+            table.add_column("Author", style="magenta", width=15)
 
-        for pr in prs:
-            table.add_row(
-                str(pr["number"]),
-                pr["title"][:50],
-                pr["head"]["ref"],
-                pr["user"]["login"]
-            )
+            for pr in prs:
+                table.add_row(
+                    str(pr["number"]),
+                    pr["title"][:50],
+                    pr["head"]["ref"],
+                    pr["user"]["login"]
+                )
 
-        console.print(table)
+            console.print(table)
+
         return prs
 
     except (requests.ConnectionError, requests.Timeout) as e:
@@ -175,7 +181,8 @@ def list_pull_requests(
 def merge_pull_request(
     number: int,
     method: str = "merge",
-    repo: Optional[str] = None
+    repo: Optional[str] = None,
+    dry_run: bool = False,
 ) -> bool:
     """Merge a pull request by number."""
     from ..github import (
@@ -197,6 +204,13 @@ def merge_pull_request(
     if method not in valid_methods:
         console.print(f"[red]✗ Invalid merge method. Use: {', '.join(valid_methods)}[/red]")
         return False
+
+    if dry_run:
+        console.print(
+            f"[cyan]DRY RUN[/cyan] — would merge PR #{number} on "
+            f"{owner}/{repo_name} via '{method}'"
+        )
+        return True
 
     try:
         response = session.put(
@@ -228,7 +242,7 @@ def merge_pull_request(
         return False
 
 
-def get_pull_request(number: int, repo: Optional[str] = None) -> Optional[Dict]:
+def get_pull_request(number: int, repo: Optional[str] = None, json_output: bool = False) -> Optional[Dict]:
     """Get details of a specific pull request."""
     from ..github import (
         get_authenticated_session,
@@ -253,7 +267,8 @@ def get_pull_request(number: int, repo: Optional[str] = None) -> Optional[Dict]:
         response.raise_for_status()
         pr = response.json()
 
-        info = f"""[bold cyan]PR #{pr['number']}[/bold cyan]
+        if not json_output:
+            info = f"""[bold cyan]PR #{pr['number']}[/bold cyan]
 [bold]Title:[/bold] {pr['title']}
 [bold]State:[/bold] {pr['state']}
 [bold]Author:[/bold] {pr['user']['login']}
@@ -265,7 +280,8 @@ def get_pull_request(number: int, repo: Optional[str] = None) -> Optional[Dict]:
 {pr.get('body', 'No description provided') or 'No description provided'}
 """
 
-        console.print(Panel(info, border_style="cyan"))
+            console.print(Panel(info, border_style="cyan"))
+
         return pr
 
     except (requests.ConnectionError, requests.Timeout) as e:

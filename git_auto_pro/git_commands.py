@@ -149,41 +149,51 @@ def git_commit(message: str, conventional: bool = False, amend: bool = False) ->
         console.print(f"[red]✗ Failed to commit: {e}[/red]")
 
 
-def git_push(message: Optional[str] = None, branch: Optional[str] = None, force: bool = False) -> None:
+def git_push(message: Optional[str] = None, branch: Optional[str] = None, force: bool = False, dry_run: bool = False) -> None:
     """Push commits to remote."""
     try:
         repo = get_repo()
         git_cmd = getattr(repo, 'git')
-        
+
         # Resolve branch from config if not provided
         if branch is None:
             branch = get_default_branch()
-        
+
         # If message provided, do add + commit + push
         if message:
-            git_cmd.add(A=True)
-            
-            # Empty commit guard
-            if not _check_staging_area(repo):
-                console.print("[yellow]⚠ Nothing staged. Use 'git-auto add' first.[/yellow]")
-                raise typer.Exit()
-            
-            repo.index.commit(message)
-            console.print(f"[green]✓ Committed: {message}[/green]")
-        
+            if dry_run:
+                console.print("[cyan]DRY RUN[/cyan] — would: git add -A")
+                console.print(f"[cyan]  git commit -m {message!r}[/cyan]")
+            else:
+                git_cmd.add(A=True)
+
+                # Empty commit guard
+                if not _check_staging_area(repo):
+                    console.print("[yellow]⚠ Nothing staged. Use 'git-auto add' first.[/yellow]")
+                    raise typer.Exit()
+
+                repo.index.commit(message)
+                console.print(f"[green]✓ Committed: {message}[/green]")
+
         # Check if remote exists
         if not repo.remotes:
             console.print("[red]✗ No remote configured. Use 'git-auto init --connect <url>' first.[/red]")
             return
-        
+
         # Push to remote
+        if dry_run:
+            if force:
+                console.print(f"[cyan]DRY RUN[/cyan] — would force push to 'origin {branch}'")
+            else:
+                console.print(f"[cyan]DRY RUN[/cyan] — would push to 'origin {branch}'")
+            return
         if force:
             git_cmd.push("origin", branch, force=True)
             console.print(f"[yellow]⚠ Force pushed to {branch}[/yellow]")
         else:
             git_cmd.push("origin", branch)
             console.print(f"[green]✓ Pushed to {branch}[/green]")
-            
+
     except typer.Exit:
         raise
     except git.GitCommandError as e:
@@ -458,61 +468,136 @@ def git_clone(url: str, directory: Optional[str] = None, depth: Optional[int] = 
         console.print(f"[red]✗ Failed to clone: {e}[/red]")
 
 
-def git_stats(detailed: bool = False) -> None:
-    """Show repository statistics."""
+def git_stats(detailed: bool = False, json_output: bool = False) -> Optional[dict]:
+    """Show repository statistics. Returns the stats dict (None on failure)."""
     try:
         repo = get_repo()
-        
+
         # Basic stats
         commits = list(repo.iter_commits())
         branches = list(repo.branches)
         contributors: dict[str, int] = {}
-        
+
         for commit in commits:
             author = str(commit.author.name)
             contributors[author] = contributors.get(author, 0) + 1
-        
+
+        try:
+            current_branch = str(repo.active_branch)
+        except TypeError:
+            current_branch = "(detached HEAD)"
+
+        sorted_contributors = sorted(contributors.items(), key=lambda x: x[1], reverse=True)
+
+        stats: dict = {
+            "total_commits": len(commits),
+            "total_branches": len(branches),
+            "contributors": len(contributors),
+            "current_branch": current_branch,
+            "top_contributors": [
+                {"author": a, "commits": c} for a, c in sorted_contributors[:10]
+            ],
+        }
+
+        if json_output:
+            return stats
+
         table = Table(title="Repository Statistics", show_header=True)
         table.add_column("Metric", style="cyan", width=25)
         table.add_column("Value", style="yellow")
-        
-        table.add_row("Total Commits", str(len(commits)))
-        table.add_row("Total Branches", str(len(branches)))
-        table.add_row("Contributors", str(len(contributors)))
-        table.add_row("Current Branch", str(repo.active_branch))
-        
+
+        table.add_row("Total Commits", str(stats["total_commits"]))
+        table.add_row("Total Branches", str(stats["total_branches"]))
+        table.add_row("Contributors", str(stats["contributors"]))
+        table.add_row("Current Branch", stats["current_branch"])
+
         console.print(table)
-        
+
         if detailed:
             # Top contributors
             contrib_table = Table(title="Top Contributors", show_header=True)
             contrib_table.add_column("Author", style="cyan")
             contrib_table.add_column("Commits", style="yellow")
-            
-            sorted_contributors = sorted(contributors.items(), key=lambda x: x[1], reverse=True)
+
             for author, count in sorted_contributors[:10]:
                 contrib_table.add_row(author, str(count))
-            
+
             console.print("\n", contrib_table)
-            
+
+        return stats
+
     except Exception as e:
         console.print(f"[red]✗ Failed to get stats: {e}[/red]")
+        return None
 
 
-def git_undo(hard: bool = False, force_push: bool = False, confirm: bool = False) -> None:
+def git_sync(dry_run: bool = False) -> None:
+    """Sync the current branch with its remote: pull --rebase then push."""
+    try:
+        repo = get_repo()
+        git_cmd = getattr(repo, 'git')
+
+        try:
+            branch = str(repo.active_branch)
+        except TypeError:
+            console.print("[red]✗ Detached HEAD — switch to a branch first.[/red]")
+            return
+
+        if not repo.remotes:
+            console.print("[red]✗ No remote configured. Use 'git-auto init --connect <url>' first.[/red]")
+            return
+
+        if dry_run:
+            console.print(f"[cyan]DRY RUN[/cyan] — would: git pull --rebase origin {branch}")
+            console.print(f"[cyan]  then:  git push origin {branch}[/cyan]")
+            return
+
+        # Pull with rebase to avoid spurious merge commits during a sync.
+        try:
+            git_cmd.pull("origin", branch, "--rebase")
+            console.print(f"[green]✓ Pulled (rebase) from origin/{branch}[/green]")
+        except git.GitCommandError as e:
+            error_msg = str(e)
+            if "divergent branches" in error_msg or "Need to specify how to reconcile" in error_msg:
+                console.print("[red]✗ Branches have diverged and could not be rebased automatically.[/red]")
+                console.print("[yellow]→ Resolve conflicts, then re-run: git-auto sync[/yellow]")
+            else:
+                console.print(f"[red]✗ Failed to pull: {e}[/red]")
+            return
+
+        try:
+            git_cmd.push("origin", branch)
+            console.print(f"[green]✓ Pushed to {branch}[/green]")
+        except git.GitCommandError as e:
+            error_msg = str(e).lower()
+            if "rejected" in error_msg or "fetch first" in error_msg:
+                console.print("[red]✗ Push rejected — remote moved again during sync.[/red]")
+                console.print("[yellow]→ Run: git-auto sync   again.[/yellow]")
+            else:
+                console.print(f"[red]✗ Failed to push: {e}[/red]")
+
+    except Exception as e:
+        console.print(f"[red]✗ Sync failed: {e}[/red]")
+
+
+def git_undo(hard: bool = False, force_push: bool = False, confirm: bool = False, dry_run: bool = False) -> None:
     """Undo last commit with various strategies."""
     try:
         repo = get_repo()
         git_cmd = getattr(repo, 'git')
-        
+
         # Safety check — need at least one commit
         try:
             list(repo.iter_commits(max_count=1))
         except Exception:
             console.print("[red]✗ No commits to undo[/red]")
             return
-        
+
         if hard:
+            if dry_run:
+                console.print("[cyan]DRY RUN[/cyan] — would run: git reset --hard HEAD~1")
+                console.print("[dim]  (last commit AND all working-tree changes discarded)[/dim]")
+                return
             if not confirm:
                 console.print("[yellow]⚠  This will permanently discard changes.[/yellow]")
                 if not Confirm.ask("Type 'yes' to confirm", default=False):
@@ -520,8 +605,16 @@ def git_undo(hard: bool = False, force_push: bool = False, confirm: bool = False
                     return
             git_cmd.reset("--hard", "HEAD~1")
             console.print("[green]✓ Hard reset: last commit and all changes discarded[/green]")
-            
+
         elif force_push:
+            if dry_run:
+                console.print("[cyan]DRY RUN[/cyan] — would: git reset --soft HEAD~1")
+                if repo.remotes:
+                    branch = str(repo.active_branch)
+                    console.print(f"[cyan]  then force push 'origin {branch}'[/cyan]")
+                else:
+                    console.print("[dim]  (no remote configured, so no push)[/dim]")
+                return
             if not confirm:
                 console.print("[yellow]⚠  This will undo the last commit AND force push to remote.[/yellow]")
                 if not Confirm.ask("Type 'yes' to confirm", default=False):
@@ -529,18 +622,22 @@ def git_undo(hard: bool = False, force_push: bool = False, confirm: bool = False
                     return
             git_cmd.reset("--soft", "HEAD~1")
             console.print("[green]✓ Soft reset: last commit undone, changes kept staged[/green]")
-            
+
             # Force push
             if repo.remotes:
                 branch = str(repo.active_branch)
-                git_cmd.push("origin", branch, "--force")
+                git_cmd.push("origin", branch, force=True)
                 console.print(f"[yellow]⚠ Force pushed to {branch}[/yellow]")
             else:
                 console.print("[yellow]⚠ No remote configured — skipped force push[/yellow]")
         else:
+            if dry_run:
+                console.print("[cyan]DRY RUN[/cyan] — would run: git reset --soft HEAD~1")
+                console.print("[dim]  (last commit undone, changes kept staged)[/dim]")
+                return
             # Default: soft reset
             git_cmd.reset("--soft", "HEAD~1")
             console.print("[green]✓ Soft reset: last commit undone, changes kept staged[/green]")
-            
+
     except Exception as e:
         console.print(f"[red]✗ Failed to undo: {e}[/red]")

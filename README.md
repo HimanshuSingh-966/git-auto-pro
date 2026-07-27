@@ -8,6 +8,18 @@ Git-Auto Pro is a powerful command-line tool that automates your entire developm
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![PyPI](https://img.shields.io/badge/pypi-git--auto--pro-orange.svg)](https://pypi.org/project/git-auto-pro/)
 
+## 🆕 What's New in 2.7.0
+
+- **`--json` output** — `issue list`, `issue view`, `prs`, `stats`, and `doctor` accept `--json` to emit machine-readable JSON for scripting (`git-auto issue list --json | jq ...`).
+- **`--dry-run`** — preview destructive ops without running them: `git-auto undo --dry-run`, `push --force --dry-run`, `merge-pr 42 --dry-run`, `release patch --dry-run`.
+- **`git-auto sync`** — pull with rebase then push, in one command.
+- **Per-repo config** — drop a `.git-auto.json` at your repo root to override `~/.git-auto-config.json` (e.g. a different `default_branch` per project).
+- **Shell completion** — `git-auto --install-completion` now installs bash/zsh/fish completion.
+- **`GIT_AUTO_DEBUG`** — `export GIT_AUTO_DEBUG=1` now really enables debug logging to `~/.git-auto.log` (it was documented before but not implemented).
+- **Stronger `doctor`** — reports token scopes (warns if `repo`/`workflow` are missing), checks upstream tracking, and shows ahead/behind; supports `--json`.
+
+See the [CHANGELOG](CHANGELOG.md) for the full list.
+
 ## 🆕 What's New in 2.6.0
 
 - **Pagination** — `issue list` and `prs` now follow GitHub's `Link` header, so `--limit 500` and large repos no longer silently cap at 100.
@@ -223,7 +235,9 @@ git-auto commit "message" --amend              # Amend last commit
 git-auto push                                  # Push
 git-auto push "message"                        # Add, commit, and push
 git-auto push --force                          # Force push
+git-auto push --force --dry-run                # Preview force push without doing it
 git-auto push --safe "message"                 # Safe commit flow (test branch + PR)
+git-auto sync                                  # Pull --rebase then push (one command)
 git-auto pull                                  # Pull (merge strategy)
 git-auto pull --rebase                         # Pull with rebase
 git-auto pull --no-rebase                      # Pull with merge (default)
@@ -339,6 +353,7 @@ git-auto issue list --state closed             # List closed issues
 git-auto issue list --state all                # List all issues
 git-auto issue list --labels bug               # Filter by label
 git-auto issue list --assignee username        # Filter by assignee
+git-auto issue list --json                     # Emit JSON for scripting
 
 # View and manage issues
 git-auto issue view 42                         # View issue #42
@@ -396,6 +411,7 @@ git-auto COMMAND --help                        # Command-specific help
 git-auto undo                                  # Soft reset (keep changes staged)
 git-auto undo --hard --yes                     # Hard reset (discard changes)
 git-auto undo --push --yes                     # Soft reset + force push
+git-auto undo --dry-run                        # Preview without changing history
 ```
 
 ### Release
@@ -406,11 +422,13 @@ git-auto release major                         # Bump major version
 git-auto release 2.1.0                         # Set exact version
 git-auto release patch --draft                 # Create draft release
 git-auto release minor --notes "Custom notes"  # With release notes
+git-auto release patch --dry-run               # Preview the release without doing anything
 ```
 
 ### Doctor
 ```bash
 git-auto doctor                                # Run all diagnostics
+git-auto doctor --json                         # Emit diagnostics as JSON
 ```
 
 ### Pull Requests
@@ -420,8 +438,10 @@ git-auto pr "Feature" --draft                  # Create draft PR
 git-auto pr "Fix" --reviewer user1 --label bug # With reviewer and label
 git-auto prs                                   # List open PRs
 git-auto prs --state closed                    # List closed PRs
+git-auto prs --json                            # Emit JSON for scripting
 git-auto merge-pr 42                           # Merge PR
 git-auto merge-pr 42 --squash                  # Squash merge
+git-auto merge-pr 42 --dry-run                 # Preview the merge without doing it
 git-auto review-pr 42                          # Open PR in browser
 ```
 
@@ -495,7 +515,12 @@ git-auto templates contributing
 
 ## 🔧 Configuration Options
 
-Configuration is stored in `~/.git-auto-config.json`
+Configuration is stored in `~/.git-auto-config.json`.
+
+For per-project overrides, add a `.git-auto.json` at your repository root. It
+takes precedence over the user config (which in turn overrides the built-in
+defaults). Useful for giving one project a different `default_branch`,
+`safe_mode`, or `pr_base_branch` without changing your global settings.
 
 Available options:
 - `default_branch`: Default branch name (default: "main")

@@ -150,29 +150,29 @@ def create_release(
     version_or_bump: str,
     draft: bool = False,
     notes: Optional[str] = None,
+    dry_run: bool = False,
 ) -> None:
     """Create a release: tag, push, and optionally create GitHub release."""
     try:
         repo = git.Repo(".", search_parent_directories=True)
         git_cmd = getattr(repo, 'git')
-        
+
         # Determine new version
         current_version = _read_current_version()
-        
+
         if version_or_bump in ("patch", "minor", "major"):
             new_version = _bump_version(current_version, version_or_bump)
-            console.print(f"[cyan]Bumping: {current_version} → {new_version} ({version_or_bump})[/cyan]")
+            if not dry_run:
+                console.print(f"[cyan]Bumping: {current_version} → {new_version} ({version_or_bump})[/cyan]")
         elif VERSION_PATTERN.match(version_or_bump):
             new_version = version_or_bump
-            console.print(f"[cyan]Setting version: {new_version}[/cyan]")
+            if not dry_run:
+                console.print(f"[cyan]Setting version: {new_version}[/cyan]")
         else:
             console.print(f"[red]✗ Invalid version: {version_or_bump}. Use 'patch', 'minor', 'major', or 'X.Y.Z'[/red]")
             return
-        
-        # Update version files
-        _update_version_files(new_version)
-        
-        # Generate changelog
+
+        # Generate changelog (read-only; safe in dry-run)
         last_tag = None
         try:
             tags = sorted(repo.tags, key=lambda t: t.commit.committed_datetime, reverse=True)
@@ -180,24 +180,46 @@ def create_release(
                 last_tag = str(tags[0])
         except Exception:
             pass
-        
+
         changelog = _generate_changelog(repo, last_tag)
-        
+
         if notes:
             release_notes = notes
         else:
             release_notes = f"## v{new_version}\n\n{changelog}"
-        
+
+        tag_name = f"v{new_version}"
+
+        if dry_run:
+            console.print(f"[cyan]DRY RUN[/cyan] — planned release:")
+            console.print(f"  version: {current_version} → [bold]{new_version}[/bold]")
+            console.print(f"  files:   pyproject.toml, setup.py, __init__.py")
+            console.print(f"  commit:  chore: release v{new_version}")
+            console.print(f"  tag:     {tag_name}")
+            if repo.remotes:
+                try:
+                    branch = str(repo.active_branch)
+                    console.print(f"  push:    origin {branch} + {tag_name}")
+                except Exception:
+                    pass
+                console.print(f"  github:  {'draft ' if draft else ''}release on GitHub")
+            else:
+                console.print("  push:    (no remote configured — skipped)")
+            console.print(f"  notes:\n{release_notes}")
+            return
+
+        # Update version files
+        _update_version_files(new_version)
+
         # Commit version bump
         git_cmd.add(A=True)
         repo.index.commit(f"chore: release v{new_version}")
         console.print(f"[green]✓ Version bump committed[/green]")
-        
+
         # Create tag
-        tag_name = f"v{new_version}"
         repo.create_tag(tag_name, message=f"Release {tag_name}")
         console.print(f"[green]✓ Tag created: {tag_name}[/green]")
-        
+
         # Push commit + tag
         if repo.remotes:
             try:
@@ -207,18 +229,19 @@ def create_release(
                 console.print(f"[green]✓ Pushed to remote[/green]")
             except Exception as e:
                 console.print(f"[yellow]⚠ Push failed: {e}[/yellow]")
-        
+
         # Create GitHub release
         if repo.remotes:
             try:
-                from ..github import get_authenticated_session, get_current_user, GITHUB_API_URL
-                
+                from ..github import (
+                    get_authenticated_session,
+                    resolve_repo_ref,
+                    _api_url,
+                )
+
                 session = get_authenticated_session()
-                user = get_current_user()
-                
-                remote_url = repo.remotes.origin.url
-                repo_name = remote_url.split("/")[-1].replace(".git", "")
-                
+                owner, repo_name = resolve_repo_ref(None)
+
                 release_data = {
                     "tag_name": tag_name,
                     "name": f"v{new_version}",
@@ -226,22 +249,22 @@ def create_release(
                     "draft": draft,
                     "prerelease": False,
                 }
-                
+
                 response = session.post(
-                    f"{GITHUB_API_URL}/repos/{user['login']}/{repo_name}/releases",
+                    _api_url("repos", owner, repo_name, "releases"),
                     json=release_data,
                     timeout=10
                 )
                 response.raise_for_status()
                 release = response.json()
-                
+
                 status = "Draft release" if draft else "Release"
                 console.print(f"[green]✓ {status} created: {release['html_url']}[/green]")
-                
+
             except Exception as e:
                 console.print(f"[yellow]⚠ GitHub release creation failed: {e}[/yellow]")
                 console.print("[yellow]→ Tag was still pushed. Create release manually on GitHub.[/yellow]")
-        
+
         # Summary
         console.print(Panel(
             f"  Version: [bold cyan]v{new_version}[/bold cyan]\n"
@@ -250,7 +273,7 @@ def create_release(
             title="Release Complete",
             border_style="green"
         ))
-        
+
     except git.InvalidGitRepositoryError:
         console.print("[red]✗ Not a git repository. Run 'git-auto init' first.[/red]")
     except FileNotFoundError as e:

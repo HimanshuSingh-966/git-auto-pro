@@ -68,7 +68,8 @@ def list_issues(
     labels: Optional[str] = None,
     assignee: Optional[str] = None,
     repo: Optional[str] = None,
-    limit: int = 30
+    limit: int = 30,
+    json_output: bool = False,
 ) -> List[Dict]:
     """List GitHub issues."""
     from .github import (
@@ -78,7 +79,8 @@ def list_issues(
         _paginated_get,
     )
 
-    console.print(f"[bold cyan]📋 Listing {state.capitalize()} Issues[/bold cyan]\n")
+    if not json_output:
+        console.print(f"[bold cyan]📋 Listing {state.capitalize()} Issues[/bold cyan]\n")
 
     session = get_authenticated_session()
 
@@ -105,27 +107,28 @@ def list_issues(
             "List issues",
         )
 
-        if not issues:
-            console.print(f"[yellow]No {state} issues found[/yellow]")
-            return []
+        if not json_output:
+            if not issues:
+                console.print(f"[yellow]No {state} issues found[/yellow]")
+                return []
 
-        table = Table(show_header=True)
-        table.add_column("#", style="yellow", width=6)
-        table.add_column("Title", style="cyan")
-        table.add_column("State", style="green", width=8)
-        table.add_column("Labels", style="magenta", width=20)
+            table = Table(show_header=True)
+            table.add_column("#", style="yellow", width=6)
+            table.add_column("Title", style="cyan")
+            table.add_column("State", style="green", width=8)
+            table.add_column("Labels", style="magenta", width=20)
 
-        for issue in issues:
-            labels_str = ", ".join([label["name"] for label in issue.get("labels", [])])
-            table.add_row(
-                str(issue["number"]),
-                issue["title"][:50],
-                issue["state"],
-                labels_str[:20]
-            )
+            for issue in issues:
+                labels_str = ", ".join([label["name"] for label in issue.get("labels", [])])
+                table.add_row(
+                    str(issue["number"]),
+                    issue["title"][:50],
+                    issue["state"],
+                    labels_str[:20]
+                )
 
-        console.print(table)
-        console.print(f"\n[dim]Showing {len(issues)} issues[/dim]")
+            console.print(table)
+            console.print(f"\n[dim]Showing {len(issues)} issues[/dim]")
 
         return issues
 
@@ -137,7 +140,7 @@ def list_issues(
         return []
 
 
-def get_issue(number: int, repo: Optional[str] = None) -> Optional[Dict]:
+def get_issue(number: int, repo: Optional[str] = None, json_output: bool = False) -> Optional[Dict]:
     """Get details of a specific issue."""
     from .github import get_authenticated_session, resolve_repo_ref, _api_url
 
@@ -157,10 +160,11 @@ def get_issue(number: int, repo: Optional[str] = None) -> Optional[Dict]:
         response.raise_for_status()
         issue = response.json()
 
-        labels_str = ", ".join([label["name"] for label in issue.get("labels", [])])
-        assignees_str = ", ".join([assignee["login"] for assignee in issue.get("assignees", [])])
+        if not json_output:
+            labels_str = ", ".join([label["name"] for label in issue.get("labels", [])])
+            assignees_str = ", ".join([assignee["login"] for assignee in issue.get("assignees", [])])
 
-        info = f"""[bold cyan]Issue #{issue['number']}[/bold cyan]
+            info = f"""[bold cyan]Issue #{issue['number']}[/bold cyan]
 [bold]Title:[/bold] {issue['title']}
 [bold]State:[/bold] {issue['state']}
 [bold]Author:[/bold] {issue['user']['login']}
@@ -173,7 +177,7 @@ def get_issue(number: int, repo: Optional[str] = None) -> Optional[Dict]:
 {issue.get('body', 'No description provided')}
 """
 
-        console.print(Panel(info, border_style="cyan"))
+            console.print(Panel(info, border_style="cyan"))
 
         return issue
 
