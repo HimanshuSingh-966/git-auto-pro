@@ -6,6 +6,16 @@ import git
 import os
 
 
+@pytest.fixture(autouse=True)
+def _clear_github_auth_cache():
+    """Reset the cached GitHub session/current-user before each test so one
+    test's caching state can't leak into another."""
+    from git_auto_pro.github import clear_auth_cache
+    clear_auth_cache()
+    yield
+    clear_auth_cache()
+
+
 @pytest.fixture
 def temp_dir():
     """Create a temporary directory for tests."""

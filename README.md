@@ -8,6 +8,41 @@ Git-Auto Pro is a powerful command-line tool that automates your entire developm
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![PyPI](https://img.shields.io/badge/pypi-git--auto--pro-orange.svg)](https://pypi.org/project/git-auto-pro/)
 
+## 🆕 What's New in 2.7.0
+
+- **`--json` output** — `issue list`, `issue view`, `prs`, `stats`, and `doctor` accept `--json` to emit machine-readable JSON for scripting (`git-auto issue list --json | jq ...`).
+- **`--dry-run`** — preview destructive ops without running them: `git-auto undo --dry-run`, `push --force --dry-run`, `merge-pr 42 --dry-run`, `release patch --dry-run`.
+- **`git-auto sync`** — pull with rebase then push, in one command.
+- **Per-repo config** — drop a `.git-auto.json` at your repo root to override `~/.git-auto-config.json` (e.g. a different `default_branch` per project).
+- **Shell completion** — `git-auto --install-completion` now installs bash/zsh/fish completion.
+- **`GIT_AUTO_DEBUG`** — `export GIT_AUTO_DEBUG=1` now really enables debug logging to `~/.git-auto.log` (it was documented before but not implemented).
+- **Stronger `doctor`** — reports token scopes (warns if `repo`/`workflow` are missing), checks upstream tracking, and shows ahead/behind; supports `--json`.
+
+See the [CHANGELOG](CHANGELOG.md) for the full list.
+
+## 🆕 What's New in 2.6.0
+
+- **Pagination** — `issue list` and `prs` now follow GitHub's `Link` header, so `--limit 500` and large repos no longer silently cap at 100.
+- **Rate-limit handling** — 429 / rate-limited-403 responses report the reset time and `Retry-After`; you get a heads-up when your API budget runs low.
+- **Safe URLs** — repo/owner/branch names with special characters (`#`, `?`, spaces) are now URL-encoded, fixing broken requests and closing a path-injection gap.
+- **Faster** — the authenticated session and current user are cached per invocation, cutting the redundant `GET /user` call every GitHub command used to make.
+- **Consistent failures** — `issue create` no longer raises on API errors; it returns empty like the other issue commands.
+- **Safer token storage** — warns if the fallback token file can't be locked to `0o600`, and `logout` is honest when the keyring entry can't be removed.
+
+See the [CHANGELOG](CHANGELOG.md) for the full list.
+
+## 🆕 What's New in 2.5.0
+
+- **Org/fork repo support** — GitHub commands (`issue`, `pr`, `prs`, `merge-pr`, `review-pr`, `collab`, `protect`) now detect the repository **owner** from your `origin` remote instead of assuming it's your own. They work on organization, fork, and collaborator repos. Pass `--repo owner/name` to target any repo explicitly.
+- **`git-auto new` honors `default_branch`** — no longer hardcodes `main`; aligns the local branch to your configured default before pushing.
+- **Real backups** — `git-auto backup` now archives the full `.git` (including `objects/`), so `git-auto restore` actually brings back your history.
+- **Portable generated hooks** — `pre-commit`/`pre-push` hooks are now POSIX-`sh` safe and no longer break on `dash` (`/bin/sh` on Ubuntu/Debian) when ruff/black/pytest aren't installed.
+- **Honest PR feedback** — `git-auto pr` no longer claims "✓ Reviewers requested" when the API rejected the request; it reports the real HTTP status.
+- **Tougher network handling** — `issue close`/`update` and all PR ops now handle connection errors and timeouts gracefully instead of dumping a traceback.
+- **Modern GitHub auth** — `Bearer` tokens, current API media type, and version header; deprecated preview headers removed.
+
+See the [CHANGELOG](CHANGELOG.md) for the full list.
+
 ## ✨ Features
 
 ### 🔐 GitHub Authentication
@@ -200,9 +235,10 @@ git-auto commit "message" --amend              # Amend last commit
 git-auto push                                  # Push
 git-auto push "message"                        # Add, commit, and push
 git-auto push --force                          # Force push
+git-auto push --force --dry-run                # Preview force push without doing it
 git-auto push --safe "message"                 # Safe commit flow (test branch + PR)
+git-auto sync                                  # Pull --rebase then push (one command)
 git-auto pull                                  # Pull (merge strategy)
-git-auto pull --rebase                         # Pull with rebase
 git-auto pull --rebase                         # Pull with rebase
 git-auto pull --no-rebase                      # Pull with merge (default)
 git-auto pull --ff-only                        # Only fast-forward
@@ -317,6 +353,7 @@ git-auto issue list --state closed             # List closed issues
 git-auto issue list --state all                # List all issues
 git-auto issue list --labels bug               # Filter by label
 git-auto issue list --assignee username        # Filter by assignee
+git-auto issue list --json                     # Emit JSON for scripting
 
 # View and manage issues
 git-auto issue view 42                         # View issue #42
@@ -326,17 +363,24 @@ git-auto issue update 42 --title "New title"   # Update issue
 git-auto issue update 42 --state closed        # Change state
 ```
 
+> **Note:** Add `--repo owner/name` to target any repository you have access to.
+> Without it, the owner is detected from your `origin` remote (works for org/fork repos).
+
 ### Collaboration
 ```bash
 # Add collaborators
-git-auto collab username                       # Add to current repo
-git-auto collab username --repo myrepo         # Add to specific repo
+git-auto collab username                       # Add to current repo (owner auto-detected)
+git-auto collab username --repo owner/name     # Target any repo you have access to
 git-auto collab username --permission admin    # With permission level
 
 # Branch protection
 git-auto protect main                          # Protect main branch
-git-auto protect develop --repo myrepo         # Protect specific branch
+git-auto protect develop --repo owner/name     # Protect a branch in a specific repo
 ```
+
+> **Note:** The owner is detected from your `origin` remote, so these work for
+> organization, fork, and collaborator repos — not just repos you own. Use
+> `--repo owner/name` to override.
 
 ### Backup & Restore
 ```bash
@@ -367,6 +411,7 @@ git-auto COMMAND --help                        # Command-specific help
 git-auto undo                                  # Soft reset (keep changes staged)
 git-auto undo --hard --yes                     # Hard reset (discard changes)
 git-auto undo --push --yes                     # Soft reset + force push
+git-auto undo --dry-run                        # Preview without changing history
 ```
 
 ### Release
@@ -377,11 +422,13 @@ git-auto release major                         # Bump major version
 git-auto release 2.1.0                         # Set exact version
 git-auto release patch --draft                 # Create draft release
 git-auto release minor --notes "Custom notes"  # With release notes
+git-auto release patch --dry-run               # Preview the release without doing anything
 ```
 
 ### Doctor
 ```bash
 git-auto doctor                                # Run all diagnostics
+git-auto doctor --json                         # Emit diagnostics as JSON
 ```
 
 ### Pull Requests
@@ -391,10 +438,15 @@ git-auto pr "Feature" --draft                  # Create draft PR
 git-auto pr "Fix" --reviewer user1 --label bug # With reviewer and label
 git-auto prs                                   # List open PRs
 git-auto prs --state closed                    # List closed PRs
+git-auto prs --json                            # Emit JSON for scripting
 git-auto merge-pr 42                           # Merge PR
 git-auto merge-pr 42 --squash                  # Squash merge
+git-auto merge-pr 42 --dry-run                 # Preview the merge without doing it
 git-auto review-pr 42                          # Open PR in browser
 ```
+
+> **Note:** PR commands detect the owner from your `origin` remote, so they work
+> for organization and fork repos. Pass `--repo owner/name` to override.
 
 ## 🎯 Use Cases
 
@@ -463,7 +515,12 @@ git-auto templates contributing
 
 ## 🔧 Configuration Options
 
-Configuration is stored in `~/.git-auto-config.json`
+Configuration is stored in `~/.git-auto-config.json`.
+
+For per-project overrides, add a `.git-auto.json` at your repository root. It
+takes precedence over the user config (which in turn overrides the built-in
+defaults). Useful for giving one project a different `default_branch`,
+`safe_mode`, or `pr_base_branch` without changing your global settings.
 
 Available options:
 - `default_branch`: Default branch name (default: "main")
