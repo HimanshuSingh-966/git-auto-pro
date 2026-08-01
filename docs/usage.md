@@ -228,21 +228,33 @@ git-auto push "Add tests for login"
 ### Release Workflow
 
 ```bash
-# Update version
-git-auto config set version 1.1.0
+# Stabilize on a release branch
+git-auto switch -c release/1.1.0
+git-auto push "Prepare 1.1.0"
 
-# Create release branch
-git-auto branch release/1.1.0
-git-auto switch release/1.1.0
-
-# Merge to main
+# Merge back to main
 git-auto switch main
 git-auto merge release/1.1.0
 
-# Push and tag
-git-auto push
-git tag v1.1.0
-git push --tags
+# Preview the release, then cut it
+git-auto release 1.1.0 --dry-run
+git-auto release 1.1.0
+```
+
+`git-auto release` bumps the version in `pyproject.toml`, `setup.py`, and
+`__init__.py`, commits it as `chore: release vX.Y.Z`, creates and pushes the
+`vX.Y.Z` tag, and opens a GitHub release with notes generated from your
+conventional commits since the last tag.
+
+```bash
+# Bump automatically instead of naming a version
+git-auto release patch          # 1.1.0 → 1.1.1
+git-auto release minor          # 1.1.0 → 1.2.0
+git-auto release major          # 1.1.0 → 2.0.0
+
+# Draft the GitHub release, or supply your own notes
+git-auto release minor --draft
+git-auto release 1.2.0 --notes "Hotfix for login regression"
 ```
 
 ## Best Practices

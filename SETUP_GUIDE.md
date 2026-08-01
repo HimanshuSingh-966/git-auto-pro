@@ -17,16 +17,22 @@ This guide will help you set up, develop, test, and publish Git-Auto Pro.
 ```
 git-auto-pro/
 ├── git_auto_pro/           # Main package directory
-│   ├── __init__.py         # Package initialization
+│   ├── __init__.py         # Package version/metadata
 │   ├── cli.py              # CLI interface (Typer commands)
-│   ├── github.py           # GitHub API integration
+│   ├── github.py           # GitHub API: auth, repos, collaborators, branch protection
 │   ├── github_issues.py    # GitHub Issues management
 │   ├── git_commands.py     # Git operations (GitPython)
-│   ├── gitignore_manager.py #Interactive .gitignore Manager
-│   ├── config.py           # Configuration management
+│   ├── gitignore_manager.py # Interactive .gitignore manager
+│   ├── config.py           # Configuration (user + per-repo .git-auto.json)
 │   ├── backup.py           # Backup/restore functionality
+│   ├── logging_setup.py    # GIT_AUTO_DEBUG logging
+│   ├── commands/           # v2.0+ feature commands
+│   │   ├── doctor.py       # System diagnostics (git-auto doctor)
+│   │   ├── release.py      # Release management (git-auto release)
+│   │   └── safe_flow.py    # Safe commit flow (push --safe)
+│   ├── github_pr/          # Pull-request management
+│   │   └── pr_manager.py   # PR create/list/merge/review
 │   └── scaffolding/        # Project generators
-│       ├── __init__.py
 │       ├── project.py      # Complete project creation
 │       ├── readme.py       # README generator
 │       ├── license.py      # LICENSE generator
@@ -35,20 +41,37 @@ git-auto-pro/
 │       ├── workflows.py    # CI/CD workflow generator
 │       ├── hooks.py        # Git hooks setup
 │       └── github_templates.py  # Issue/PR templates
-├── tests/                  # Test directory
-│   ├── __init__.py
+├── tests/                  # Test suite (pytest, offline)
+│   ├── conftest.py         # Shared fixtures (temp_repo, auth-cache reset, ...)
 │   ├── test_cli.py
-│   ├── test_github.py
+│   ├── test_config.py
 │   ├── test_git_commands.py
-│   └── test_config.py
+│   ├── test_github.py
+│   ├── test_github_issues.py
+│   ├── test_pr_manager.py
+│   ├── test_gitignore_manager.py
+│   ├── test_doctor.py
+│   ├── test_release.py
+│   ├── test_safe_flow.py
+│   ├── test_scaffolding.py
+│   ├── test_backup.py
+│   ├── test_github_remote.py
+│   ├── test_github_robustness.py
+│   ├── test_hooks.py
+│   └── test_tier3.py
 ├── docs/                   # Documentation
 │   ├── usage.md
 │   ├── api.md
-│   └── examples.md
+│   ├── examples.md
+│   └── troubleshooting.md
+├── examples/               # Example scripts
+├── scripts/                # build/install/test shell scripts
+├── Makefile                # Dev tasks (install/test/lint/build/publish)
 ├── pyproject.toml          # Project metadata & dependencies
 ├── README.md               # Main documentation
 ├── SETUP_GUIDE.md          # This file
 ├── CONTRIBUTING.md         # Contribution guidelines
+├── CHANGELOG.md            # Release history
 ├── LICENSE                 # MIT License
 └── .gitignore              # Git ignore rules
 ```

@@ -29,24 +29,31 @@ class TestCLIBasics:
 
 
 class TestConfigCommands:
-    """Test configuration commands."""
-    
+    """Test configuration commands (isolated to a temp config file so they
+    never touch the real ~/.git-auto-config.json)."""
+
+    @pytest.fixture(autouse=True)
+    def _isolate_config(self, tmp_path, monkeypatch):
+        cfg = tmp_path / ".git-auto-config.json"
+        monkeypatch.setattr("git_auto_pro.config.CONFIG_FILE", cfg)
+        yield cfg
+
     def test_config_set_and_get(self):
         """Test setting and getting config values."""
         # Set a value
         result = runner.invoke(app, ["config", "set", "test_key", "test_value"])
         assert result.exit_code == 0
-        
+
         # Get the value
         result = runner.invoke(app, ["config", "get", "test_key"])
         assert result.exit_code == 0
         assert "test_value" in result.output
-    
+
     def test_config_set_boolean(self):
         """Test setting boolean config values."""
         result = runner.invoke(app, ["config", "set", "test_bool", "true"])
         assert result.exit_code == 0
-    
+
     def test_config_set_integer(self):
         """Test setting integer config values."""
         result = runner.invoke(app, ["config", "set", "test_int", "42"])

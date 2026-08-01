@@ -369,13 +369,20 @@ def show_current_gitignore(ignored: Set[str]) -> None:
     input("\nPress Enter to continue...")
 
 
-def clean_ignored_files() -> None:
+def clean_ignored_files(dry_run: bool = False) -> None:
     """Remove ignored files from git tracking."""
+    if dry_run:
+        console.print("[cyan]DRY RUN[/cyan] — would run:")
+        console.print("[dim]  git rm -r --cached .[/dim]")
+        console.print("[dim]  git add .[/dim]")
+        console.print("[dim](files stay on disk; only the index is rewritten)[/dim]")
+        return
+
     console.print("\n[yellow]⚠️  This will remove ignored files from git tracking[/yellow]")
     console.print("[dim]Files will remain on disk but won't be tracked[/dim]\n")
-    
+
     confirm = questionary.confirm("Continue?").ask()
-    
+
     if confirm:
         import subprocess
         try:
@@ -385,10 +392,10 @@ def clean_ignored_files() -> None:
                 capture_output=True,
                 text=True
             )
-            
+
             # Re-add everything (respecting .gitignore)
             subprocess.run(["git", "add", "."])
-            
+
             console.print("[green]✓ Cleaned ignored files from git[/green]")
             console.print("[dim]Run 'git-auto commit' to save changes[/dim]")
         except Exception as e:

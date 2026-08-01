@@ -204,14 +204,14 @@ git-auto templates issue
 git-auto templates pr
 git-auto templates contributing
 
-# Create initial issues for team
-git-auto issue create -t "Setup CI/CD" -l "infrastructure"
-git-auto issue create -t "Write documentation" -l "documentation"
+# Create initial issues for team (with assignees at creation time)
+git-auto issue create -t "Setup CI/CD" -l "infrastructure" -a alice
+git-auto issue create -t "Write documentation" -l "documentation" -a bob
 git-auto issue create -t "Add unit tests" -l "testing"
 
-# Assign issues
-git-auto issue update 1 --assignees alice
-git-auto issue update 2 --assignees bob
+# Or re-title / change state later
+git-auto issue update 1 --title "Setup CI/CD pipeline"
+git-auto issue update 2 --state closed
 ```
 
 ## Example 8: Interactive .gitignore Setup
