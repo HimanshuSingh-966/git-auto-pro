@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.1] - 2026-08-01
+
+### 📚 Documentation & Test Quality (Patch Release)
+
+This release contains no new user-facing features — it corrects test isolation bugs and brings the documentation back in sync with the 2.7.0 implementation.
+
+#### 🐛 Fixes
+- **`test_cli.py` config isolation** — `TestConfigCommands` was writing test keys to the real `~/.git-auto-config.json`. Now monkeypatched to a temporary file; verified no side effects on your actual config.
+- **`.gitignore` cleanup** — removed stray `"""` from the last line (accidental paste).
+- **`build.sh` ordering** — moved format/lint steps before `pytest` so the build verifies the code that was actually tested, not code rewritten by `ruff --fix` afterward.
+
+#### 🧪 Testing
+- **Added `test_pr_manager.py`** — 9 tests covering PR create/list/merge/get/review. The PR manager had zero test coverage despite the CHANGELOG claiming it existed since 2.4.0.
+- **Dropped `test_undo.py`** — it was a 0-line placeholder; undo is already covered by the `--dry-run` tests in `test_tier3.py`.
+- **127 tests total** (up from 118).
+
+#### 📄 Documentation
+- **Rewrote `CONTRIBUTING.md`** — removed the npm/Jest/JavaScript boilerplate that told contributors to `npm install` and write Jest tests; now tailored to this Python/pytest project, the Makefile, and the test-isolation rule.
+- **Updated `SETUP_GUIDE.md`** — added `commands/`, `github_pr/`, `gitignore_manager.py`, `backup.py`, `logging_setup.py`, and the full 16-file test list to the project-structure tree (was showing only 4 tests, pre-v2.0).
+- **Completed `docs/api.md`** — covered all ~43 commands with correct options (`--json`, `--dry-run`, `--repo owner/name`, `sync`, `doctor`, `undo`, `release`, etc.). It was missing ~30 commands.
+- **Fixed `docs/examples.md`** — removed the invalid `issue update --assignees` (that command has no `--assignees`; assignees are set at `issue create` via `-a`).
+- **Fixed `docs/usage.md` release section** — replaced the manual `git tag v1.1.0 && git push --tags` workflow with the implemented `git-auto release` command, which handles version-file updates, commit, tag, push, and GitHub release creation in one step.
+
+---
+
 ## [2.7.0] - 2026-07-27
 
 ### ✨ New Features

@@ -146,4 +146,3 @@ cython_debug/
 # Project specific
 *.log
 .git-auto-config.json
-"""

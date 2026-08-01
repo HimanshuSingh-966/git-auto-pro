@@ -8,7 +8,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="git-auto-pro",
-    version="2.7.0",
+    version="2.7.1",
     author="Himanshu Singh",
     author_email="choudharyhimanshusingh966@gmail.com",
     description="Complete Git + GitHub automation CLI tool",
